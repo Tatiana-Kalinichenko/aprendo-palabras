@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#d55f3f" />
+  <title>Aprendo Español — картки</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Aprendo Español</p>
+        <h1>Картки для іспанської</h1>
+        <p>Створюйте власні картки українською та іспанською, додавайте теми, синоніми й відмінювання у примітках, а потім вручну керуйте режимами “Словник”, “Вивчення” і “Знаю”.</p>
+        <div class="stats" id="stats"></div>
+      </div>
+      <div class="hero-actions">
+        <button class="primary" id="studyBtn">Вчити</button>
+        <button class="ghost" id="closeStudyBtn" type="button">Закрити навчання</button>
+        <button class="secondary" id="exportCsvBtn" type="button">Експорт CSV</button>
+        <button class="ghost" id="importCsvBtn" type="button">Імпорт CSV</button>
+        <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden />
+        <p class="import-hint">Для CSV з Excel краще “CSV UTF-8”. Імпорт також пробує Windows-1251/1252.</p>
+      </div>
+    </header>
+
+    <section class="study-panel" id="studyPanel" aria-live="polite"></section>
+
+    <main class="grid">
+      <div class="side-column">
+        <section class="panel">
+          <h2>Нова картка</h2>
+          <p class="hint">Нові слова автоматично потрапляють у режим “Словник”. У поле приміток можна додати відмінювання, синоніми або приклади.</p>
+          <form id="createCardForm">
+            <label for="cardFront">Сторона 1 — слово українською</label>
+            <textarea id="cardFront" required placeholder="Наприклад: говорити"></textarea>
+
+            <label for="cardBack">Сторона 2 — переклад іспанською</label>
+            <textarea id="cardBack" required placeholder="Наприклад: hablar"></textarea>
+            <div class="accent-row" aria-label="Іспанські символи для перекладу">
+              <button type="button" data-target="cardBack" data-char="á">á</button>
+              <button type="button" data-target="cardBack" data-char="é">é</button>
+              <button type="button" data-target="cardBack" data-char="í">í</button>
+              <button type="button" data-target="cardBack" data-char="ó">ó</button>
+              <button type="button" data-target="cardBack" data-char="ú">ú</button>
+              <button type="button" data-target="cardBack" data-char="ü">ü</button>
+              <button type="button" data-target="cardBack" data-char="ñ">ñ</button>
+              <button type="button" data-target="cardBack" data-char="¿">¿</button>
+              <button type="button" data-target="cardBack" data-char="¡">¡</button>
+            </div>
+
+            <label for="cardNotes">Примітки, синоніми, відмінювання</label>
+            <textarea id="cardNotes" placeholder="Наприклад: hablo, hablas, habla; синонім: conversar"></textarea>
+
+            <label>Теги / категорії</label>
+            <div class="tag-picker" id="createTagPicker"></div>
+            <input type="text" id="newTagsInput" placeholder="Нові теги через кому: дієслова, щоденні фрази" />
+
+            <div class="full-row">
+              <button class="primary" type="submit">Створити картку</button>
+              <button class="ghost" type="reset">Очистити</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel">
+          <h2>Теги</h2>
+          <p class="hint">Перейменування тегу автоматично оновлює всі картки. Видалення тегу не видаляє картки.</p>
+          <div class="form-row">
+            <input type="text" id="quickTagName" placeholder="Новий тег" />
+            <button class="secondary" id="quickAddTag" type="button">Додати тег</button>
+          </div>
+          <div class="tag-list tag-list-spaced" id="tagList"></div>
+        </section>
+      </div>
+
+      <section class="panel">
+        <h2>Список карток</h2>
+        <p class="hint">Обирайте одну, кілька або всі видимі картки. Для групової зміни режиму позначте картки, виберіть режим і натисніть “Режим” або просто виберіть режим у списку.</p>
+
+        <div class="toolbar">
+          <input type="text" id="searchInput" placeholder="Пошук за словом, перекладом, приміткою або тегом" />
+          <select id="modeFilter">
+            <option value="all">Всі режими</option>
+            <option value="dictionary">Словник</option>
+            <option value="learning">Вивчення</option>
+            <option value="known">Знаю</option>
+          </select>
+          <select id="sortSelect">
+            <option value="front">За алфавітом Сторони 1</option>
+            <option value="back">За алфавітом Сторони 2</option>
+            <option value="tags">За алфавітом по тегах</option>
+            <option value="mode">За режимом</option>
+          </select>
+        </div>
+
+        <div class="bulkbar">
+          <small id="selectedInfo">Обрано: 0</small>
+          <select id="bulkModeSelect">
+            <option value="">Змінити режим...</option>
+            <option value="dictionary">Словник</option>
+            <option value="learning">Вивчення</option>
+            <option value="known">Знаю</option>
+          </select>
+          <input type="text" id="bulkTagInput" placeholder="Теги через кому" />
+          <div class="bulk-actions">
+            <button class="mini blue" id="bulkApplyMode" type="button">Режим</button>
+            <button class="mini good" id="bulkAddTags" type="button">Додати теги</button>
+            <button class="mini" id="bulkReplaceTags" type="button">Замінити теги</button>
+            <button class="mini" id="bulkRemoveTags" type="button">Прибрати теги</button>
+            <button class="mini danger icon-btn" id="bulkDelete" type="button" aria-label="Видалити обрані картки" title="Видалити обрані картки">🗑</button>
+          </div>
+        </div>
+
+        <div class="table-wrap" id="tableWrap"></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="cardModalBackdrop" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h2 id="editTitle">Редагувати картку</h2>
+          <p class="hint">Можна змінити обидві сторони, примітки, теги та режим.</p>
+        </div>
+        <button class="mini" id="closeCardModal" type="button">Закрити</button>
+      </div>
+      <form id="editCardForm">
+        <input type="hidden" id="editCardId" />
+
+        <label for="editFront">Сторона 1 — слово українською</label>
+        <textarea id="editFront" required></textarea>
+
+        <label for="editBack">Сторона 2 — переклад іспанською</label>
+        <textarea id="editBack" required></textarea>
+        <div class="accent-row" aria-label="Іспанські символи для редагування">
+          <button type="button" data-target="editBack" data-char="á">á</button>
+          <button type="button" data-target="editBack" data-char="é">é</button>
+          <button type="button" data-target="editBack" data-char="í">í</button>
+          <button type="button" data-target="editBack" data-char="ó">ó</button>
+          <button type="button" data-target="editBack" data-char="ú">ú</button>
+          <button type="button" data-target="editBack" data-char="ü">ü</button>
+          <button type="button" data-target="editBack" data-char="ñ">ñ</button>
+          <button type="button" data-target="editBack" data-char="¿">¿</button>
+          <button type="button" data-target="editBack" data-char="¡">¡</button>
+        </div>
+
+        <label for="editNotes">Примітки, синоніми, відмінювання</label>
+        <textarea id="editNotes"></textarea>
+
+        <label for="editMode">Режим</label>
+        <select id="editMode">
+          <option value="dictionary">Словник</option>
+          <option value="learning">Вивчення</option>
+          <option value="known">Знаю</option>
+        </select>
+
+        <label>Теги / категорії</label>
+        <div class="tag-picker" id="editTagPicker"></div>
+        <input type="text" id="editNewTagsInput" placeholder="Нові теги через кому" />
+
+        <div class="full-row">
+          <button class="primary" type="submit">Зберегти зміни</button>
+          <button class="danger icon-btn" id="deleteFromModal" type="button" aria-label="Видалити картку" title="Видалити картку">🗑</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+</body>
+</html>
