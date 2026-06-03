@@ -1,4 +1,5 @@
 const STORAGE_KEY = "aprendo-espanol-cards-v1";
+    const STUDY_SIDE_MODE_KEY = "aprendo-espanol-study-side-mode";
     const MAX_LEARNING = 30;
     const MODE_LABELS = {
       dictionary: "Словник",
@@ -10,6 +11,7 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
     let state = loadState();
     let selectedIds = new Set();
     let study = null;
+    let studyHistory = [];
     let toastTimer = null;
 
     const $ = (selector) => document.querySelector(selector);
@@ -18,6 +20,7 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       stats: $("#stats"),
       studyBtn: $("#studyBtn"),
       closeStudyBtn: $("#closeStudyBtn"),
+      studySideMode: $("#studySideMode"),
       exportCsvBtn: $("#exportCsvBtn"),
       importCsvBtn: $("#importCsvBtn"),
       csvFileInput: $("#csvFileInput"),
@@ -175,6 +178,36 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       const isActive = activeSort === sortValue;
       return `<button class="sort-header ${isActive ? "active" : ""}" data-sort="${escapeHtml(sortValue)}" type="button">${escapeHtml(label)}${isActive ? '<span class="sort-indicator">↑</span>' : ''}</button>`;
     }
+
+    function getInitialStudySide() {
+  const mode = els.studySideMode ? els.studySideMode.value : "random";
+
+  if (mode === "front") return "front";
+  if (mode === "back") return "back";
+
+  return Math.random() < 0.5 ? "front" : "back";
+}
+
+function setStudyCard(card, options = {}) {
+  const { rememberCurrent = true, scroll = true } = options;
+
+  if (rememberCurrent && study?.cardId && study.cardId !== card.id) {
+    studyHistory.push(study.cardId);
+  }
+
+  study = {
+    cardId: card.id,
+    side: getInitialStudySide(),
+    flipped: false,
+    answer: ""
+  };
+
+  renderAll();
+
+  if (scroll) {
+    els.studyPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
 
     function learningCountExcluding(ids = []) {
       const excluded = new Set(ids);
@@ -390,58 +423,75 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
     }
 
     function renderStudy() {
-      if (!study) {
-        els.studyPanel.classList.remove("active");
-        els.studyPanel.innerHTML = "";
-        return;
-      }
+  if (!study) {
+    els.studyPanel.classList.remove("active");
+    els.studyPanel.innerHTML = "";
+    return;
+  }
 
-      const card = state.cards.find((item) => item.id === study.cardId);
-      if (!card || card.mode !== "learning") {
-        pickStudyCard();
-        return;
-      }
+  const card = state.cards.find((item) => item.id === study.cardId);
 
-      els.studyPanel.classList.add("active");
+  if (!card || card.mode !== "learning") {
+    pickStudyCard();
+    return;
+  }
 
-      const showingSide = study.flipped ? (study.side === "front" ? "back" : "front") : study.side;
-      const label = showingSide === "front" ? "Сторона 1 — українською" : "Сторона 2 — іспанською";
-      const text = showingSide === "front" ? card.front : card.back;
-      const notesHtml = study.flipped && card.notes ? `<div class="study-notes">${multiline(card.notes)}</div>` : "";
-      const answerHtml = study.flipped && study.answer.trim()
-        ? `<div><label>Ваш варіант</label><div class="answer-preview">${multiline(study.answer)}</div></div>`
-        : "";
+  els.studyPanel.classList.add("active");
 
-      const controls = study.flipped ? `
-        ${answerHtml}
-        <button class="ghost" data-study-action="flip" type="button">Перевернути</button>
-        <button class="ghost" data-study-action="next" type="button">Інша картка</button>
-        <button class="mini blue" data-study-action="dictionary" type="button">← Повернути в словник</button>
-        <button class="mini good" data-study-action="known" type="button">Знаю →</button>
-        <button class="mini icon-btn" data-study-action="edit" type="button" aria-label="Редагувати картку" title="Редагувати картку">✎</button>
-      ` : `
-        <label for="studyAnswer">Ваш переклад, якщо хочете перевірити себе</label>
-        <textarea id="studyAnswer" class="answer-box" placeholder="Поле необовʼязкове. Напишіть переклад і натисніть “Перевернути”.">${escapeHtml(study.answer)}</textarea>
-        <button class="primary" data-study-action="flip" type="button">Перевернути</button>
-      `;
+  const showingSide = study.flipped
+    ? (study.side === "front" ? "back" : "front")
+    : study.side;
 
-      els.studyPanel.innerHTML = `
-        <div class="study-layout">
-          <div class="flashcard">
-            <p class="side-label">${escapeHtml(label)}</p>
-            <p class="card-word">${multiline(text)}</p>
-            ${notesHtml}
-          </div>
-          <div class="study-controls">
-            <div>
-              <h2 class="study-title">Режим вивчення</h2>
-              <p class="hint study-hint">Категорії тут не показуються, щоб не підказувати відповідь.</p>
-            </div>
-            ${controls}
-          </div>
+  const label = showingSide === "front"
+    ? "Сторона 1 — українською"
+    : "Сторона 2 — іспанською";
+
+  const text = showingSide === "front" ? card.front : card.back;
+
+  const notesHtml = showingSide === "back" && card.notes
+    ? `<div class="study-notes">${multiline(card.notes)}</div>`
+    : "";
+
+  const controls = `
+    <label for="studyAnswer">Ваш переклад, якщо хочете перевірити себе</label>
+
+    <textarea id="studyAnswer" class="answer-box" placeholder="Поле необовʼязкове. Напишіть переклад і натисніть кнопку перевороту.">${escapeHtml(study.answer)}</textarea>
+
+    <div class="study-icon-row">
+      <button class="ghost icon-btn study-nav-icon" data-study-action="previous" type="button" aria-label="Попередня картка" title="Попередня картка">←</button>
+
+      <button class="primary icon-btn study-nav-icon" data-study-action="flip" type="button" aria-label="Перевернути" title="Перевернути">↻</button>
+
+      <button class="ghost icon-btn study-nav-icon" data-study-action="next" type="button" aria-label="Наступна картка" title="Наступна картка">→</button>
+
+      <button class="mini icon-btn study-nav-icon" data-study-action="edit" type="button" aria-label="Редагувати картку" title="Редагувати картку">✎</button>
+    </div>
+
+    <div class="study-mode-row">
+      <button class="mini blue" data-study-action="dictionary" type="button">В словник</button>
+      <button class="mini good" data-study-action="known" type="button">Знаю</button>
+    </div>
+  `;
+
+  els.studyPanel.innerHTML = `
+    <div class="study-layout">
+      <div class="flashcard">
+        <p class="side-label">${escapeHtml(label)}</p>
+        <p class="card-word">${multiline(text)}</p>
+        ${notesHtml}
+      </div>
+
+      <div class="study-controls">
+        <div>
+          <h2 class="study-title">Режим вивчення</h2>
+          <p class="hint study-hint">Категорії тут не показуються, щоб не підказувати відповідь.</p>
         </div>
-      `;
-    }
+
+        ${controls}
+      </div>
+    </div>
+  `;
+}
 
     function getCheckedTagIds(container) {
       return Array.from(container.querySelectorAll("input[type='checkbox']:checked")).map((input) => input.value);
@@ -970,72 +1020,84 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       reader.readAsArrayBuffer(file);
     }
 
-    function pickStudyCard(excludeId = null) {
-      const learning = state.cards.filter((card) => card.mode === "learning");
-      if (!learning.length) {
-        study = null;
-        saveState();
-        renderAll();
-        showToast("У режимі “Вивчення” більше немає карток.");
-        return;
-      }
+    function pickStudyCard(excludeId = null, options = {}) {
+  const learning = state.cards.filter((card) => card.mode === "learning");
 
-      const candidates = learning.length > 1
-        ? learning.filter((card) => card.id !== excludeId)
-        : learning;
+  if (!learning.length) {
+    study = null;
+    studyHistory = [];
+    saveState();
+    renderAll();
+    showToast("У режимі “Вивчення” більше немає карток.");
+    return;
+  }
 
-      const card = candidates[Math.floor(Math.random() * candidates.length)];
-      study = {
-        cardId: card.id,
-        side: Math.random() < 0.5 ? "front" : "back",
-        flipped: false,
-        answer: ""
-      };
-      renderAll();
-      els.studyPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+  const candidates = learning.length > 1
+    ? learning.filter((card) => card.id !== excludeId)
+    : learning;
+
+  const card = candidates[Math.floor(Math.random() * candidates.length)];
+
+  setStudyCard(card, options);
+}
 
     function handleStudyAction(action) {
-      if (!study) return;
-      const card = state.cards.find((item) => item.id === study.cardId);
-      if (!card) return;
+  if (!study) return;
 
-      const answerEl = $("#studyAnswer");
-      if (answerEl) study.answer = answerEl.value;
+  const card = state.cards.find((item) => item.id === study.cardId);
+  if (!card) return;
 
-      if (action === "flip") {
-        study.flipped = !study.flipped;
-        renderStudy();
+  const answerEl = $("#studyAnswer");
+  if (answerEl) study.answer = answerEl.value;
+
+  if (action === "flip") {
+    study.flipped = !study.flipped;
+    renderStudy();
+    return;
+  }
+
+  if (action === "next") {
+    pickStudyCard(study.cardId);
+    return;
+  }
+
+  if (action === "previous") {
+    while (studyHistory.length) {
+      const previousId = studyHistory.pop();
+      const previousCard = state.cards.find((item) => item.id === previousId && item.mode === "learning");
+
+      if (previousCard) {
+        setStudyCard(previousCard, { rememberCurrent: false });
         return;
-      }
-
-      if (action === "next") {
-        pickStudyCard(study.cardId);
-        return;
-      }
-
-      if (action === "dictionary") {
-        card.mode = "dictionary";
-        card.updatedAt = new Date().toISOString();
-        saveState();
-        pickStudyCard(card.id);
-        showToast("Картку повернуто в Словник.");
-        return;
-      }
-
-      if (action === "known") {
-        card.mode = "known";
-        card.updatedAt = new Date().toISOString();
-        saveState();
-        pickStudyCard(card.id);
-        showToast("Картку переміщено в “Знаю”.");
-        return;
-      }
-
-      if (action === "edit") {
-        openCardModal(card.id);
       }
     }
+
+    showToast("Попередньої картки немає.");
+    return;
+  }
+
+  if (action === "dictionary") {
+    card.mode = "dictionary";
+    card.updatedAt = new Date().toISOString();
+    saveState();
+    pickStudyCard(card.id, { rememberCurrent: false });
+    showToast("Картку повернуто в Словник.");
+    return;
+  }
+
+  if (action === "known") {
+    card.mode = "known";
+    card.updatedAt = new Date().toISOString();
+    saveState();
+    pickStudyCard(card.id, { rememberCurrent: false });
+    showToast("Картку переміщено в “Знаю”.");
+    return;
+  }
+
+  if (action === "edit") {
+    openCardModal(card.id);
+  }
+}
 
     function insertAtCursor(targetId, char) {
       const input = document.getElementById(targetId);
@@ -1063,9 +1125,22 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       els.modeFilter.addEventListener("change", renderCardList);
       els.sortSelect.addEventListener("change", renderCardList);
 
-      els.studyBtn.addEventListener("click", () => pickStudyCard());
+      const savedStudySideMode = localStorage.getItem(STUDY_SIDE_MODE_KEY);
+      if (savedStudySideMode && els.studySideMode) {
+        els.studySideMode.value = savedStudySideMode;
+      }
+
+      els.studySideMode.addEventListener("change", () => {
+        localStorage.setItem(STUDY_SIDE_MODE_KEY, els.studySideMode.value);
+      });
+
+      els.studyBtn.addEventListener("click", () => {
+        studyHistory = [];
+        pickStudyCard(null, { rememberCurrent: false });
+      });
       els.closeStudyBtn.addEventListener("click", () => {
         study = null;
+        studyHistory = [];
         renderAll();
       });
 

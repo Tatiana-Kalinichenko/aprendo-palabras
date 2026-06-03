@@ -20,6 +20,14 @@
       <div class="hero-actions">
         <button class="primary" id="studyBtn">Вчити</button>
         <button class="ghost" id="closeStudyBtn" type="button">Закрити навчання</button>
+        <label class="study-mode-label" for="studySideMode">
+          <span>Початкова сторона</span>
+         <select id="studySideMode">
+            <option value="front">Сторона 1</option>
+            <option value="back">Сторона 2</option>
+            <option value="random" selected>Довільно</option>
+         </select>
+        </label>
         <button class="secondary" id="exportCsvBtn" type="button">Експорт CSV</button>
         <button class="ghost" id="importCsvBtn" type="button">Імпорт CSV</button>
         <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden />

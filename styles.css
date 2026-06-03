@@ -727,3 +727,47 @@
     .study-hint {
       margin: 0;
     }
+
+    .study-mode-label {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.study-mode-label span {
+  text-align: center;
+}
+
+.study-mode-label select {
+  padding: 10px 12px;
+  border-radius: 999px;
+}
+
+.study-icon-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.study-mode-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.study-nav-icon {
+  width: 44px;
+  height: 44px;
+  font-size: 1.25rem;
+}
+
+.study-controls .answer-box {
+  width: 100%;
+}
