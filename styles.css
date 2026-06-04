@@ -474,6 +474,11 @@
       color: var(--accent-dark);
     }
 
+    .mode-reinforcement {
+      background: #f4e7ff;
+      color: #7a3bb2;
+    }
+
     .mode-known {
       background: var(--green-soft);
       color: var(--green);

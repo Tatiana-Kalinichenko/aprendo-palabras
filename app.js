@@ -1,12 +1,21 @@
 const STORAGE_KEY = "aprendo-espanol-cards-v1";
     const STUDY_SIDE_MODE_KEY = "aprendo-espanol-study-side-mode";
     const MAX_LEARNING = 30;
+    const MAX_REINFORCEMENT = 100;
+
     const MODE_LABELS = {
       dictionary: "Словник",
       learning: "Вивчення",
+      reinforcement: "Закріплення",
       known: "Знаю"
     };
-    const MODE_ORDER = ["dictionary", "learning", "known"];
+
+    const MODE_ORDER = ["dictionary", "learning", "reinforcement", "known"];
+
+    const STUDY_SESSION_LABELS = {
+      learning: "Вивчення",
+      reinforcement: "Закріплення"
+    };
 
     let state = loadState();
     let selectedIds = new Set();
@@ -20,6 +29,7 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       stats: $("#stats"),
       studyBtn: $("#studyBtn"),
       closeStudyBtn: $("#closeStudyBtn"),
+      studySessionMode: $("#studySessionMode"),
       studySideMode: $("#studySideMode"),
       exportCsvBtn: $("#exportCsvBtn"),
       importCsvBtn: $("#importCsvBtn"),
@@ -189,18 +199,23 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
 }
 
 function setStudyCard(card, options = {}) {
-  const { rememberCurrent = true, scroll = true } = options;
+  const {
+  rememberCurrent = true,
+  scroll = true,
+  sessionMode = study?.sessionMode || getSelectedStudySessionMode()
+} = options;
 
   if (rememberCurrent && study?.cardId && study.cardId !== card.id) {
     studyHistory.push(study.cardId);
   }
 
   study = {
-    cardId: card.id,
-    side: getInitialStudySide(),
-    flipped: false,
-    answer: ""
-  };
+  sessionMode,
+  cardId: card.id,
+  side: getInitialStudySide(),
+  flipped: false,
+  answer: ""
+};
 
   renderAll();
 
@@ -209,17 +224,38 @@ function setStudyCard(card, options = {}) {
   }
 }
 
-    function learningCountExcluding(ids = []) {
-      const excluded = new Set(ids);
-      return state.cards.filter((card) => card.mode === "learning" && !excluded.has(card.id)).length;
-    }
+    function getModeLimit(mode) {
+  if (mode === "learning") return MAX_LEARNING;
+  if (mode === "reinforcement") return MAX_REINFORCEMENT;
+  return Infinity;
+}
 
-    function canMoveToLearning(ids) {
-      const idSet = new Set(Array.from(ids).filter(isExistingCardId));
-      const currentOutsideSelection = state.cards.filter((card) => card.mode === "learning" && !idSet.has(card.id)).length;
-      const movingIntoLearning = state.cards.filter((card) => idSet.has(card.id) && card.mode !== "learning").length;
-      return currentOutsideSelection + movingIntoLearning <= MAX_LEARNING;
-    }
+function getModeLimitMessage(mode) {
+  if (mode === "learning") {
+    return `У режимі “Вивчення” може бути не більше ${MAX_LEARNING} карток.`;
+  }
+
+  if (mode === "reinforcement") {
+    return `У режимі “Закріплення” може бути не більше ${MAX_REINFORCEMENT} карток.`;
+  }
+
+  return "";
+}
+
+function canMoveToMode(ids, mode) {
+  const limit = getModeLimit(mode);
+  if (!Number.isFinite(limit)) return true;
+
+  const idSet = new Set(Array.from(ids).filter(isExistingCardId));
+  const currentOutsideSelection = state.cards.filter((card) => card.mode === mode && !idSet.has(card.id)).length;
+  const movingIntoMode = state.cards.filter((card) => idSet.has(card.id) && card.mode !== mode).length;
+
+  return currentOutsideSelection + movingIntoMode <= limit;
+}
+
+function getSelectedStudySessionMode() {
+  return els.studySessionMode?.value === "reinforcement" ? "reinforcement" : "learning";
+}
 
     function showToast(message) {
       window.clearTimeout(toastTimer);
@@ -241,19 +277,21 @@ function setStudyCard(card, options = {}) {
     }
 
     function renderStats() {
-      const counts = {
-        dictionary: state.cards.filter((card) => card.mode === "dictionary").length,
-        learning: state.cards.filter((card) => card.mode === "learning").length,
-        known: state.cards.filter((card) => card.mode === "known").length
-      };
+  const counts = {
+    dictionary: state.cards.filter((card) => card.mode === "dictionary").length,
+    learning: state.cards.filter((card) => card.mode === "learning").length,
+    reinforcement: state.cards.filter((card) => card.mode === "reinforcement").length,
+    known: state.cards.filter((card) => card.mode === "known").length
+  };
 
-      els.stats.innerHTML = `
-        <span class="stat"><strong>${counts.dictionary}</strong> у Словнику</span>
-        <span class="stat"><strong>${counts.learning}/${MAX_LEARNING}</strong> у Вивченні</span>
-        <span class="stat"><strong>${counts.known}</strong> Знаю</span>
-        <span class="stat"><strong>${state.tags.length}</strong> тегів</span>
-      `;
-    }
+  els.stats.innerHTML = `
+    <span class="stat"><strong>${counts.dictionary}</strong> у Словнику</span>
+    <span class="stat"><strong>${counts.learning}/${MAX_LEARNING}</strong> у Вивченні</span>
+    <span class="stat"><strong>${counts.reinforcement}/${MAX_REINFORCEMENT}</strong> у Закріпленні</span>
+    <span class="stat"><strong>${counts.known}</strong> Знаю</span>
+    <span class="stat"><strong>${state.tags.length}</strong> тегів</span>
+  `;
+}
 
     function renderTagPickers() {
       const renderPicker = (container, name, selected = []) => {
@@ -373,6 +411,7 @@ function setStudyCard(card, options = {}) {
               <select data-card-action="mode" data-card-id="${escapeHtml(card.id)}" aria-label="Змінити режим картки">
                 <option value="dictionary" ${card.mode === "dictionary" ? "selected" : ""}>Словник</option>
                 <option value="learning" ${card.mode === "learning" ? "selected" : ""}>Вивчення</option>
+                <option value="reinforcement" ${card.mode === "reinforcement" ? "selected" : ""}>Закріплення</option>
                 <option value="known" ${card.mode === "known" ? "selected" : ""}>Знаю</option>
               </select>
             </td>
@@ -416,23 +455,27 @@ function setStudyCard(card, options = {}) {
     }
 
     function updateStudyButton() {
-      const learningCount = state.cards.filter((card) => card.mode === "learning").length;
-      els.studyBtn.disabled = learningCount < 1;
-      els.studyBtn.textContent = learningCount < 1 ? "Немає карток для вивчення" : "Вчити";
-      els.closeStudyBtn.style.display = study ? "block" : "none";
+     const sessionMode = getSelectedStudySessionMode();
+      const cardsCount = state.cards.filter((card) => card.mode === sessionMode).length;
+      const sessionLabel = STUDY_SESSION_LABELS[sessionMode];
+
+      els.studyBtn.disabled = cardsCount < 1;
+     els.studyBtn.textContent = cardsCount < 1 ? `Немає карток: ${sessionLabel}` : "Вчити";
+     els.closeStudyBtn.style.display = study ? "block" : "none";
     }
 
-    function renderStudy() {
+function renderStudy() {
   if (!study) {
     els.studyPanel.classList.remove("active");
     els.studyPanel.innerHTML = "";
     return;
   }
 
+  const sessionMode = study.sessionMode || "learning";
   const card = state.cards.find((item) => item.id === study.cardId);
 
-  if (!card || card.mode !== "learning") {
-    pickStudyCard();
+  if (!card || card.mode !== sessionMode) {
+    pickStudyCard(study.cardId, { rememberCurrent: false, sessionMode });
     return;
   }
 
@@ -452,6 +495,17 @@ function setStudyCard(card, options = {}) {
     ? `<div class="study-notes">${multiline(card.notes)}</div>`
     : "";
 
+  const modeControls = sessionMode === "reinforcement"
+    ? `
+      <button class="mini blue" data-study-action="dictionary" type="button">&lt;- Словник</button>
+      <button class="mini" data-study-action="learning" type="button">&lt;- Вчити</button>
+      <button class="mini good" data-study-action="known" type="button">Знаю -&gt;</button>
+    `
+    : `
+      <button class="mini blue" data-study-action="dictionary" type="button">&lt;- Словник</button>
+      <button class="mini good" data-study-action="reinforcement" type="button">Закріпити -&gt;</button>
+    `;
+
   const controls = `
     <label for="studyAnswer">Ваш переклад, якщо хочете перевірити себе</label>
 
@@ -468,8 +522,7 @@ function setStudyCard(card, options = {}) {
     </div>
 
     <div class="study-mode-row">
-      <button class="mini blue" data-study-action="dictionary" type="button">В словник</button>
-      <button class="mini good" data-study-action="known" type="button">Знаю</button>
+      ${modeControls}
     </div>
   `;
 
@@ -483,7 +536,7 @@ function setStudyCard(card, options = {}) {
 
       <div class="study-controls">
         <div>
-          <h2 class="study-title">Режим вивчення</h2>
+          <h2 class="study-title">Режим: ${escapeHtml(STUDY_SESSION_LABELS[sessionMode])}</h2>
           <p class="hint study-hint">Категорії тут не показуються, щоб не підказувати відповідь.</p>
         </div>
 
@@ -557,8 +610,8 @@ function setStudyCard(card, options = {}) {
       if (!card) return;
 
       const newMode = els.editMode.value;
-      if (newMode === "learning" && card.mode !== "learning" && !canMoveToLearning([card.id])) {
-        showToast(`У режимі “Вивчення” може бути не більше ${MAX_LEARNING} карток.`);
+      if (newMode !== card.mode && !canMoveToMode([card.id], newMode)) {
+        showToast(getModeLimitMessage(newMode));
         els.editMode.value = card.mode;
         return;
       }
@@ -620,8 +673,8 @@ function setStudyCard(card, options = {}) {
         return false;
       }
 
-      if (mode === "learning" && !canMoveToLearning(idList)) {
-        showToast(`У режимі “Вивчення” може бути не більше ${MAX_LEARNING} карток.`);
+      if (!canMoveToMode(idList, mode)) {
+        showToast(getModeLimitMessage(mode));
         return false;
       }
 
@@ -636,7 +689,11 @@ function setStudyCard(card, options = {}) {
 
       if (study) {
         const current = state.cards.find((card) => card.id === study.cardId);
-        if (!current || current.mode !== "learning") pickStudyCard();
+        const sessionMode = study.sessionMode || getSelectedStudySessionMode();
+
+        if (!current || current.mode !== sessionMode) {
+          pickStudyCard(study.cardId, { rememberCurrent: false, sessionMode });
+        }
       }
 
       saveState();
@@ -909,8 +966,15 @@ function setStudyCard(card, options = {}) {
 
     function mapCsvMode(value) {
       const key = normalize(value);
+
       if (["learning", "вивчення", "учу", "вчу"].includes(key)) return "learning";
+
+      if (["reinforcement", "закріплення", "закріпити", "повторення", "review"].includes(key)) {
+        return "reinforcement";
+      }
+
       if (["known", "знаю", "вивчено"].includes(key)) return "known";
+
       return "dictionary";
     }
 
@@ -960,6 +1024,9 @@ function setStudyCard(card, options = {}) {
       let skipped = 0;
       let movedToDictionary = 0;
 
+      let plannedLearning = state.cards.filter((card) => card.mode === "learning").length;
+      let plannedReinforcement = state.cards.filter((card) => card.mode === "reinforcement").length;
+
       for (const row of dataRows) {
         const front = String(row[indexes.front] || "").trim();
         const back = String(row[indexes.back] || "").trim();
@@ -970,9 +1037,23 @@ function setStudyCard(card, options = {}) {
         }
 
         let mode = mapCsvMode(row[indexes.mode] || "dictionary");
-        if (mode === "learning" && !canMoveToLearning([`csv_${imported}_${Date.now()}`])) {
-          mode = "dictionary";
-          movedToDictionary += 1;
+
+        if (mode === "learning") {
+          if (plannedLearning >= MAX_LEARNING) {
+            mode = "dictionary";
+            movedToDictionary += 1;
+          } else {
+            plannedLearning += 1;
+          }
+        }
+
+        if (mode === "reinforcement") {
+          if (plannedReinforcement >= MAX_REINFORCEMENT) {
+            mode = "dictionary";
+            movedToDictionary += 1;
+          } else {
+            plannedReinforcement += 1;
+          }
         }
 
         state.cards.push({
@@ -1000,7 +1081,9 @@ function setStudyCard(card, options = {}) {
       let message = `Імпортовано карток: ${imported}.`;
       if (sourceEncoding) message += ` Кодування: ${sourceEncoding}.`;
       if (skipped) message += ` Пропущено рядків: ${skipped}.`;
-      if (movedToDictionary) message += ` ${movedToDictionary} карт. перенесено в Словник через ліміт Вивчення.`;
+      if (movedToDictionary) {
+        message += ` ${movedToDictionary} карт. перенесено в Словник через ліміт режимів.`;
+      }
       showToast(message);
     }
 
@@ -1021,30 +1104,34 @@ function setStudyCard(card, options = {}) {
     }
 
     function pickStudyCard(excludeId = null, options = {}) {
-  const learning = state.cards.filter((card) => card.mode === "learning");
+      const sessionMode = options.sessionMode || study?.sessionMode || getSelectedStudySessionMode();
+      const pool = state.cards.filter((card) => card.mode === sessionMode);
+      const sessionLabel = STUDY_SESSION_LABELS[sessionMode] || MODE_LABELS[sessionMode];
 
-  if (!learning.length) {
-    study = null;
-    studyHistory = [];
-    saveState();
-    renderAll();
-    showToast("У режимі “Вивчення” більше немає карток.");
-    return;
-  }
+      if (!pool.length) {
+        study = null;
+        studyHistory = [];
+        saveState();
+        renderAll();
+        showToast(`У режимі “${sessionLabel}” більше немає карток.`);
+        return;
+      }
 
-  const candidates = learning.length > 1
-    ? learning.filter((card) => card.id !== excludeId)
-    : learning;
+      const candidates = pool.length > 1
+        ? pool.filter((card) => card.id !== excludeId)
+        : pool;
 
-  const card = candidates[Math.floor(Math.random() * candidates.length)];
+      const card = candidates[Math.floor(Math.random() * candidates.length)];
 
-  setStudyCard(card, options);
-}
+      setStudyCard(card, { ...options, sessionMode });
+    }
 
     function handleStudyAction(action) {
   if (!study) return;
 
+  const sessionMode = study.sessionMode || getSelectedStudySessionMode();
   const card = state.cards.find((item) => item.id === study.cardId);
+
   if (!card) return;
 
   const answerEl = $("#studyAnswer");
@@ -1057,17 +1144,17 @@ function setStudyCard(card, options = {}) {
   }
 
   if (action === "next") {
-    pickStudyCard(study.cardId);
+    pickStudyCard(study.cardId, { sessionMode });
     return;
   }
 
   if (action === "previous") {
     while (studyHistory.length) {
       const previousId = studyHistory.pop();
-      const previousCard = state.cards.find((item) => item.id === previousId && item.mode === "learning");
+      const previousCard = state.cards.find((item) => item.id === previousId && item.mode === sessionMode);
 
       if (previousCard) {
-        setStudyCard(previousCard, { rememberCurrent: false });
+        setStudyCard(previousCard, { rememberCurrent: false, sessionMode });
         return;
       }
     }
@@ -1076,21 +1163,20 @@ function setStudyCard(card, options = {}) {
     return;
   }
 
-  if (action === "dictionary") {
-    card.mode = "dictionary";
-    card.updatedAt = new Date().toISOString();
-    saveState();
-    pickStudyCard(card.id, { rememberCurrent: false });
-    showToast("Картку повернуто в Словник.");
-    return;
-  }
+  if (["dictionary", "learning", "reinforcement", "known"].includes(action)) {
+    if (!canMoveToMode([card.id], action)) {
+      showToast(getModeLimitMessage(action));
+      return;
+    }
 
-  if (action === "known") {
-    card.mode = "known";
+    card.mode = action;
     card.updatedAt = new Date().toISOString();
+
     saveState();
-    pickStudyCard(card.id, { rememberCurrent: false });
-    showToast("Картку переміщено в “Знаю”.");
+
+    pickStudyCard(card.id, { rememberCurrent: false, sessionMode });
+
+    showToast(`Картку переміщено в “${MODE_LABELS[action]}”.`);
     return;
   }
 
@@ -1134,9 +1220,17 @@ function setStudyCard(card, options = {}) {
         localStorage.setItem(STUDY_SIDE_MODE_KEY, els.studySideMode.value);
       });
 
-      els.studyBtn.addEventListener("click", () => {
+      els.studySessionMode.addEventListener("change", () => {
+        study = null;
         studyHistory = [];
-        pickStudyCard(null, { rememberCurrent: false });
+        renderAll();
+      });
+
+      els.studyBtn.addEventListener("click", () => {
+        const sessionMode = getSelectedStudySessionMode();
+
+        studyHistory = [];
+        pickStudyCard(null, { rememberCurrent: false, sessionMode });
       });
       els.closeStudyBtn.addEventListener("click", () => {
         study = null;
