@@ -14,13 +14,23 @@
       <div>
         <p class="eyebrow">Aprendo Español</p>
         <h1>Картки для іспанської</h1>
-        <p>Створюйте власні картки українською та іспанською, додавайте теми, синоніми й відмінювання у примітках, а потім вручну керуйте режимами “Словник”, “Вивчення” і “Знаю”.</p>
+        <p>Створюйте власні картки українською та іспанською, додавайте теми, синоніми й відмінювання у примітках, а потім вручну керуйте режимами “Словник”, “Вивчення”, “Закріплення” і “Знаю”.</p>
         <div class="stats" id="stats"></div>
       </div>
       <div class="hero-actions">
         <button class="primary" id="studyBtn">Вчити</button>
+
         <button class="ghost" id="closeStudyBtn" type="button">Закрити навчання</button>
-        <label class="study-mode-label" for="studySideMode">
+
+        <label class="study-mode-label" for="studySessionMode">
+         <span>Сесія</span>
+          <select id="studySessionMode">
+           <option value="learning" selected>Вивчення</option>
+            <option value="reinforcement">Закріплення</option>
+         </select>
+        </label>
+
+<label class="study-mode-label" for="studySideMode">
           <span>Початкова сторона</span>
          <select id="studySideMode">
             <option value="front">Сторона 1</option>
@@ -95,6 +105,7 @@
             <option value="all">Всі режими</option>
             <option value="dictionary">Словник</option>
             <option value="learning">Вивчення</option>
+            <option value="reinforcement">Закріплення</option>
             <option value="known">Знаю</option>
           </select>
           <select id="sortSelect">
@@ -111,6 +122,7 @@
             <option value="">Змінити режим...</option>
             <option value="dictionary">Словник</option>
             <option value="learning">Вивчення</option>
+            <option value="reinforcement">Закріплення</option>
             <option value="known">Знаю</option>
           </select>
           <input type="text" id="bulkTagInput" placeholder="Теги через кому" />
@@ -164,6 +176,7 @@
         <select id="editMode">
           <option value="dictionary">Словник</option>
           <option value="learning">Вивчення</option>
+          <option value="reinforcement">Закріплення</option>
           <option value="known">Знаю</option>
         </select>
 
