@@ -116,8 +116,32 @@
           </select>
         </div>
 
+        <div class="list-meta" aria-live="polite">
+          <div class="page-range" id="pageRangeInfo">0-0 з 0</div>
+
+          <div class="pagination-controls" aria-label="Посторінкова навігація списку карток">
+            <label class="page-size-control" for="pageSizeSelect">
+            На сторінці
+              <select id="pageSizeSelect">
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+                <option value="500">500</option>
+              </select>
+            </label>
+
+            <button class="mini icon-btn" id="prevPageBtn" type="button" aria-label="Попередня сторінка">‹</button>
+            <button class="mini icon-btn" id="nextPageBtn" type="button" aria-label="Наступна сторінка">›</button>
+          </div>
+        </div>
+
         <div class="bulkbar">
-          <small id="selectedInfo">Обрано: 0</small>
+          <div class="selection-summary">
+            <small id="selectedInfo">Обрано: 0</small>
+            <button class="mini" id="clearSelectionBtn" type="button" disabled>
+              Зняти всі
+            </button>
+          </div>
           <select id="bulkModeSelect">
             <option value="">Змінити режим...</option>
             <option value="dictionary">Словник</option>
