@@ -2,6 +2,9 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
     const STUDY_SIDE_MODE_KEY = "aprendo-espanol-study-side-mode";
     const MAX_LEARNING = 30;
     const MAX_REINFORCEMENT = 100;
+    const PAGE_SIZE_KEY = "aprendo-espanol-page-size";
+    const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
+    const DEFAULT_PAGE_SIZE = 50;
 
     const MODE_LABELS = {
       dictionary: "Словник",
@@ -22,6 +25,9 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
     let study = null;
     let studyHistory = [];
     let toastTimer = null;
+
+    let currentPage = 1;
+    let pageSize = getSavedPageSize();
 
     const $ = (selector) => document.querySelector(selector);
 
@@ -47,7 +53,12 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       searchInput: $("#searchInput"),
       modeFilter: $("#modeFilter"),
       sortSelect: $("#sortSelect"),
+      pageRangeInfo: $("#pageRangeInfo"),
+      pageSizeSelect: $("#pageSizeSelect"),
+      prevPageBtn: $("#prevPageBtn"),
+      nextPageBtn: $("#nextPageBtn"),
       selectedInfo: $("#selectedInfo"),
+      clearSelectionBtn: $("#clearSelectionBtn"),
       bulkModeSelect: $("#bulkModeSelect"),
       bulkTagInput: $("#bulkTagInput"),
       bulkApplyMode: $("#bulkApplyMode"),
@@ -83,6 +94,11 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
         console.warn("Could not load data", error);
         return { cards: [], tags: [] };
       }
+    }
+
+    function getSavedPageSize() {
+      const saved = Number(localStorage.getItem(PAGE_SIZE_KEY));
+      return PAGE_SIZE_OPTIONS.includes(saved) ? saved : DEFAULT_PAGE_SIZE;
     }
 
     function saveState() {
@@ -181,7 +197,13 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
 
     function updateSelectedInfo() {
       selectedIds = new Set(Array.from(selectedIds).filter(isExistingCardId));
-      els.selectedInfo.textContent = `Обрано: ${selectedIds.size}`;
+
+      const selectedCount = selectedIds.size;
+      els.selectedInfo.textContent = `Обрано: ${selectedCount}`;
+
+      if (els.clearSelectionBtn) {
+        els.clearSelectionBtn.disabled = selectedCount === 0;
+      }
     }
 
     function sortHeaderButton(sortValue, label, activeSort) {
@@ -285,12 +307,13 @@ function getSelectedStudySessionMode() {
   };
 
   els.stats.innerHTML = `
+    <span class="stat"><strong>${state.cards.length}</strong> карток усього</span>
     <span class="stat"><strong>${counts.dictionary}</strong> у Словнику</span>
     <span class="stat"><strong>${counts.learning}/${MAX_LEARNING}</strong> у Вивченні</span>
     <span class="stat"><strong>${counts.reinforcement}/${MAX_REINFORCEMENT}</strong> у Закріпленні</span>
     <span class="stat"><strong>${counts.known}</strong> Знаю</span>
     <span class="stat"><strong>${state.tags.length}</strong> тегів</span>
-  `;
+`;
 }
 
     function renderTagPickers() {
@@ -367,11 +390,75 @@ function getSelectedStudySessionMode() {
       return filtered;
     }
 
+    function getPageCount(total) {
+      return Math.max(1, Math.ceil(total / pageSize));
+    }
+
+    function clampCurrentPage(total) {
+      const pageCount = getPageCount(total);
+      currentPage = Math.min(Math.max(currentPage, 1), pageCount);
+      return pageCount;
+    }
+
+    function getPaginatedCards(cards) {
+      const pageCount = clampCurrentPage(cards.length);
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = Math.min(startIndex + pageSize, cards.length);
+
+      return {
+        cards: cards.slice(startIndex, endIndex),
+        startIndex,
+        endIndex,
+        pageCount
+      };
+    }
+
+    function getDisplayedCards() {
+      return getPaginatedCards(getVisibleCards()).cards;
+    }
+
+    function updatePaginationControls(totalFiltered, startIndex, endIndex, pageCount) {
+      if (els.pageSizeSelect && els.pageSizeSelect.value !== String(pageSize)) {
+      els.pageSizeSelect.value = String(pageSize);
+      }
+
+      els.pageRangeInfo.textContent = totalFiltered
+      ? `${startIndex + 1}-${endIndex} з ${totalFiltered}`
+        : "0-0 з 0";
+
+      els.prevPageBtn.disabled = currentPage <= 1 || totalFiltered === 0;
+      els.nextPageBtn.disabled = currentPage >= pageCount || totalFiltered === 0;
+    }
+
+    function resetPageAndRenderCardList() {
+      currentPage = 1;
+      renderCardList();
+    }
+
+    function clearAllSelections() {
+      if (!selectedIds.size) {
+        showToast("Немає обраних карток.");
+        return;
+      }
+
+      selectedIds.clear();
+      renderCardList();
+      showToast("Усі виділення знято.");
+    }
+
     function renderCardList() {
       const visible = getVisibleCards();
-      const allVisibleSelected = visible.length > 0 && visible.every((card) => selectedIds.has(card.id));
+      const {
+        cards: pageCards,
+        startIndex,
+        endIndex,
+        pageCount
+      } = getPaginatedCards(visible);
+
+      const allVisibleSelected = pageCards.length > 0 && pageCards.every((card) => selectedIds.has(card.id));
 
       updateSelectedInfo();
+      updatePaginationControls(visible.length, startIndex, endIndex, pageCount);
 
       if (!state.cards.length) {
         els.tableWrap.innerHTML = `<div class="empty">Поки що немає жодної картки. Створіть першу зліва.</div>`;
@@ -387,7 +474,7 @@ function getSelectedStudySessionMode() {
       let lastGroup = null;
       const rows = [];
 
-      for (const card of visible) {
+      for (const card of pageCards) {
         const group = sort === "tags" ? getPrimaryTagName(card) : sort === "mode" ? MODE_LABELS[card.mode] : null;
         if (group && group !== lastGroup) {
           rows.push(`<tr class="group-row"><td colspan="8">${escapeHtml(group)}</td></tr>`);
@@ -1207,9 +1294,32 @@ function renderStudy() {
         }
       });
 
-      els.searchInput.addEventListener("input", renderCardList);
-      els.modeFilter.addEventListener("change", renderCardList);
-      els.sortSelect.addEventListener("change", renderCardList);
+      els.searchInput.addEventListener("input", resetPageAndRenderCardList);
+      els.modeFilter.addEventListener("change", resetPageAndRenderCardList);
+      els.sortSelect.addEventListener("change", resetPageAndRenderCardList);
+
+      els.pageSizeSelect.addEventListener("change", () => {
+        const nextPageSize = Number(els.pageSizeSelect.value);
+        pageSize = PAGE_SIZE_OPTIONS.includes(nextPageSize) ? nextPageSize : DEFAULT_PAGE_SIZE;
+        localStorage.setItem(PAGE_SIZE_KEY, String(pageSize));
+        currentPage = 1;
+        renderCardList();
+      });
+
+      els.prevPageBtn.addEventListener("click", () => {
+        if (currentPage > 1) {
+          currentPage -= 1;
+          renderCardList();
+        }
+      });
+
+      els.nextPageBtn.addEventListener("click", () => {
+        const pageCount = getPageCount(getVisibleCards().length);
+        if (currentPage < pageCount) {
+          currentPage += 1;
+          renderCardList();
+        }
+      });
 
       const savedStudySideMode = localStorage.getItem(STUDY_SIDE_MODE_KEY);
       if (savedStudySideMode && els.studySideMode) {
@@ -1258,7 +1368,8 @@ function renderStudy() {
           els.bulkModeSelect.value = "";
         }
       }
-
+      
+      els.clearSelectionBtn.addEventListener("click", clearAllSelections);
       els.bulkApplyMode.addEventListener("click", applyBulkModeFromToolbar);
       els.bulkModeSelect.addEventListener("change", () => {
         if (els.bulkModeSelect.value) applyBulkModeFromToolbar();
@@ -1296,6 +1407,7 @@ function renderStudy() {
         const sortButton = event.target.closest("[data-sort]");
         if (sortButton) {
           els.sortSelect.value = sortButton.dataset.sort;
+          currentPage = 1;
           renderCardList();
           return;
         }
@@ -1331,12 +1443,14 @@ function renderStudy() {
         }
 
         if (event.target.id === "selectAllVisible") {
-          const visible = getVisibleCards();
+          const visible = getDisplayedCards();
+
           if (event.target.checked) {
             visible.forEach((card) => selectedIds.add(card.id));
           } else {
             visible.forEach((card) => selectedIds.delete(card.id));
           }
+
           renderCardList();
           return;
         }
