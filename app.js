@@ -17,13 +17,21 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
 
     const STUDY_SESSION_LABELS = {
       learning: "Вивчення",
-      reinforcement: "Закріплення"
+      reinforcement: "Закріплення",
+      review: "Повтор"
+    };
+
+    const STUDY_SESSION_CARD_MODES = {
+      learning: "learning",
+      reinforcement: "reinforcement",
+      review: "known"
     };
 
     let state = { cards: [], tags: [] };
     let selectedIds = new Set();
     let study = null;
     let studyHistory = [];
+    let studyDeck = createEmptyStudyDeck();
     let toastTimer = null;
 
     let currentPage = 1;
@@ -358,6 +366,68 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
   return Math.random() < 0.5 ? "front" : "back";
 }
 
+function createEmptyStudyDeck(sessionMode = null) {
+  return {
+    sessionMode,
+    queueIds: [],
+    lastCycleIds: []
+  };
+}
+
+function resetStudyDeck(sessionMode = null) {
+  studyDeck = createEmptyStudyDeck(sessionMode);
+}
+
+function getStudyCardMode(sessionMode) {
+  return STUDY_SESSION_CARD_MODES[sessionMode] || STUDY_SESSION_CARD_MODES.learning;
+}
+
+function getStudySessionLabel(sessionMode) {
+  return STUDY_SESSION_LABELS[sessionMode] || STUDY_SESSION_LABELS.learning;
+}
+
+function shuffleIds(ids) {
+  const shuffled = ids.slice();
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+function isSameOrder(first, second) {
+  return first.length === second.length && first.every((id, index) => id === second[index]);
+}
+
+function rotateFirstIdToEnd(ids) {
+  return ids.length > 1 ? ids.slice(1).concat(ids[0]) : ids;
+}
+
+function avoidSameCycleOrder(ids, previousIds) {
+  if (ids.length <= 1 || !isSameOrder(ids, previousIds)) return ids;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const shuffled = shuffleIds(ids);
+    if (!isSameOrder(shuffled, previousIds)) return shuffled;
+  }
+
+  return rotateFirstIdToEnd(ids);
+}
+
+function avoidImmediateRepeat(ids, previousId, previousCycleIds = []) {
+  if (ids.length <= 1 || !previousId || ids[0] !== previousId) return ids;
+
+  const rotated = rotateFirstIdToEnd(ids);
+  return isSameOrder(rotated, previousCycleIds) ? ids : rotated;
+}
+
+function buildStudyCycle(ids, previousCycleIds, previousId) {
+  const shuffled = avoidSameCycleOrder(shuffleIds(ids), previousCycleIds);
+  return avoidImmediateRepeat(shuffled, previousId, previousCycleIds);
+}
+
 function setStudyCard(card, options = {}) {
   const {
   rememberCurrent = true,
@@ -414,7 +484,8 @@ function canMoveToMode(ids, mode) {
 }
 
 function getSelectedStudySessionMode() {
-  return els.studySessionMode?.value === "reinforcement" ? "reinforcement" : "learning";
+  const selectedMode = els.studySessionMode?.value;
+  return STUDY_SESSION_CARD_MODES[selectedMode] ? selectedMode : "learning";
 }
 
     function showToast(message) {
@@ -681,8 +752,9 @@ function getSelectedStudySessionMode() {
 
     function updateStudyButton() {
      const sessionMode = getSelectedStudySessionMode();
-      const cardsCount = state.cards.filter((card) => card.mode === sessionMode).length;
-      const sessionLabel = STUDY_SESSION_LABELS[sessionMode];
+      const cardMode = getStudyCardMode(sessionMode);
+      const cardsCount = state.cards.filter((card) => card.mode === cardMode).length;
+      const sessionLabel = getStudySessionLabel(sessionMode);
 
       els.studyBtn.disabled = cardsCount < 1;
      els.studyBtn.textContent = cardsCount < 1 ? `Немає карток: ${sessionLabel}` : "Вчити";
@@ -696,10 +768,11 @@ function renderStudy() {
     return;
   }
 
-  const sessionMode = study.sessionMode || "learning";
+  const sessionMode = STUDY_SESSION_CARD_MODES[study.sessionMode] ? study.sessionMode : "learning";
+  const cardMode = getStudyCardMode(sessionMode);
   const card = state.cards.find((item) => item.id === study.cardId);
 
-  if (!card || card.mode !== sessionMode) {
+  if (!card || card.mode !== cardMode) {
     pickStudyCard(study.cardId, { rememberCurrent: false, sessionMode });
     return;
   }
@@ -761,7 +834,7 @@ function renderStudy() {
 
       <div class="study-controls">
         <div>
-          <h2 class="study-title">Режим: ${escapeHtml(STUDY_SESSION_LABELS[sessionMode])}</h2>
+          <h2 class="study-title">Режим: ${escapeHtml(getStudySessionLabel(sessionMode))}</h2>
           <p class="hint study-hint">Категорії тут не показуються, щоб не підказувати відповідь.</p>
         </div>
 
@@ -879,6 +952,8 @@ function renderStudy() {
 
       if (study && idList.includes(study.cardId)) {
         study = null;
+        studyHistory = [];
+        resetStudyDeck();
       }
 
       saveState();
@@ -915,8 +990,9 @@ function renderStudy() {
       if (study) {
         const current = state.cards.find((card) => card.id === study.cardId);
         const sessionMode = study.sessionMode || getSelectedStudySessionMode();
+        const cardMode = getStudyCardMode(sessionMode);
 
-        if (!current || current.mode !== sessionMode) {
+        if (!current || current.mode !== cardMode) {
           pickStudyCard(study.cardId, { rememberCurrent: false, sessionMode });
         }
       }
@@ -1330,23 +1406,45 @@ function renderStudy() {
 
     function pickStudyCard(excludeId = null, options = {}) {
       const sessionMode = options.sessionMode || study?.sessionMode || getSelectedStudySessionMode();
-      const pool = state.cards.filter((card) => card.mode === sessionMode);
-      const sessionLabel = STUDY_SESSION_LABELS[sessionMode] || MODE_LABELS[sessionMode];
+      const cardMode = getStudyCardMode(sessionMode);
+      const pool = state.cards.filter((card) => card.mode === cardMode);
+      const sessionLabel = getStudySessionLabel(sessionMode);
 
       if (!pool.length) {
         study = null;
         studyHistory = [];
+        resetStudyDeck();
         saveState();
         renderAll();
         showToast(`У режимі “${sessionLabel}” більше немає карток.`);
         return;
       }
 
-      const candidates = pool.length > 1
-        ? pool.filter((card) => card.id !== excludeId)
-        : pool;
+      const poolIds = pool.map((card) => card.id);
+      const poolIdSet = new Set(poolIds);
+      const cardsById = new Map(pool.map((card) => [card.id, card]));
 
-      const card = candidates[Math.floor(Math.random() * candidates.length)];
+      if (studyDeck.sessionMode !== sessionMode) {
+        resetStudyDeck(sessionMode);
+      }
+
+      studyDeck.queueIds = studyDeck.queueIds.filter((id) => poolIdSet.has(id));
+
+      if (!studyDeck.queueIds.length) {
+        const cycleIds = buildStudyCycle(poolIds, studyDeck.lastCycleIds, excludeId);
+        studyDeck.lastCycleIds = cycleIds.slice();
+        studyDeck.queueIds = cycleIds.slice();
+      } else {
+        studyDeck.queueIds = avoidImmediateRepeat(studyDeck.queueIds, excludeId);
+      }
+
+      const cardId = studyDeck.queueIds.shift();
+      const card = cardsById.get(cardId);
+
+      if (!card) {
+        pickStudyCard(excludeId, { ...options, sessionMode });
+        return;
+      }
 
       setStudyCard(card, { ...options, sessionMode });
     }
@@ -1354,7 +1452,8 @@ function renderStudy() {
     function handleStudyAction(action) {
   if (!study) return;
 
-  const sessionMode = study.sessionMode || getSelectedStudySessionMode();
+  const sessionMode = STUDY_SESSION_CARD_MODES[study.sessionMode] ? study.sessionMode : getSelectedStudySessionMode();
+  const cardMode = getStudyCardMode(sessionMode);
   const card = state.cards.find((item) => item.id === study.cardId);
 
   if (!card) return;
@@ -1376,7 +1475,7 @@ function renderStudy() {
   if (action === "previous") {
     while (studyHistory.length) {
       const previousId = studyHistory.pop();
-      const previousCard = state.cards.find((item) => item.id === previousId && item.mode === sessionMode);
+      const previousCard = state.cards.find((item) => item.id === previousId && item.mode === cardMode);
 
       if (previousCard) {
         setStudyCard(previousCard, { rememberCurrent: false, sessionMode });
@@ -1470,6 +1569,7 @@ function renderStudy() {
       els.studySessionMode.addEventListener("change", () => {
         study = null;
         studyHistory = [];
+        resetStudyDeck();
         renderAll();
       });
 
@@ -1477,11 +1577,13 @@ function renderStudy() {
         const sessionMode = getSelectedStudySessionMode();
 
         studyHistory = [];
+        resetStudyDeck(sessionMode);
         pickStudyCard(null, { rememberCurrent: false, sessionMode });
       });
       els.closeStudyBtn.addEventListener("click", () => {
         study = null;
         studyHistory = [];
+        resetStudyDeck();
         renderAll();
       });
 
