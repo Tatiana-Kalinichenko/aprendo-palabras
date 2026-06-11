@@ -27,7 +27,7 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       review: "known"
     };
 
-    let state = loadState();
+    let state = { cards: [], tags: [] };
     let selectedIds = new Set();
     let study = null;
     let studyHistory = [];
@@ -35,7 +35,10 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
     let toastTimer = null;
 
     let currentPage = 1;
-    let pageSize = getSavedPageSize();
+    let pageSize = DEFAULT_PAGE_SIZE;
+    let savedStudySideMode = null;
+    let storageBackend = "local";
+    let storageWriteQueue = Promise.resolve();
 
     const $ = (selector) => document.querySelector(selector);
 
@@ -89,28 +92,163 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       toast: $("#toast")
     };
 
-    function loadState() {
+    function getDefaultState() {
+      return { cards: [], tags: [] };
+    }
+
+    function normalizeStoredState(value) {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return { cards: [], tags: [] };
-        const parsed = JSON.parse(raw);
+        const parsed = typeof value === "string" ? JSON.parse(value) : value;
+        if (!parsed || typeof parsed !== "object") return getDefaultState();
+
         return {
           cards: Array.isArray(parsed.cards) ? parsed.cards : [],
           tags: Array.isArray(parsed.tags) ? parsed.tags : []
         };
       } catch (error) {
-        console.warn("Could not load data", error);
-        return { cards: [], tags: [] };
+        console.warn("Could not parse stored data", error);
+        return getDefaultState();
       }
     }
 
-    function getSavedPageSize() {
-      const saved = Number(localStorage.getItem(PAGE_SIZE_KEY));
+    function normalizePageSize(value) {
+      const saved = Number(value);
       return PAGE_SIZE_OPTIONS.includes(saved) ? saved : DEFAULT_PAGE_SIZE;
     }
 
+    function normalizeStudySideMode(value) {
+      return ["front", "back", "random"].includes(value) ? value : null;
+    }
+
+    function canUseExtensionStorage() {
+      return typeof chrome !== "undefined" && chrome.storage && chrome.storage.local;
+    }
+
+    function chromeStorageGet(keys) {
+      return new Promise((resolve, reject) => {
+        chrome.storage.local.get(keys, (items) => {
+          const error = chrome.runtime && chrome.runtime.lastError;
+          if (error) {
+            reject(new Error(error.message));
+            return;
+          }
+
+          resolve(items || {});
+        });
+      });
+    }
+
+    function chromeStorageSet(items) {
+      return new Promise((resolve, reject) => {
+        chrome.storage.local.set(items, () => {
+          const error = chrome.runtime && chrome.runtime.lastError;
+          if (error) {
+            reject(new Error(error.message));
+            return;
+          }
+
+          resolve();
+        });
+      });
+    }
+
+    function readLocalStorageValue(key) {
+      try {
+        return localStorage.getItem(key);
+      } catch (error) {
+        console.warn(`Could not read ${key} from localStorage`, error);
+        return null;
+      }
+    }
+
+    function writeLocalStorageValue(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch (error) {
+        console.warn(`Could not write ${key} to localStorage`, error);
+      }
+    }
+
+    function hasOwn(object, key) {
+      return Object.prototype.hasOwnProperty.call(object, key);
+    }
+
+    function cloneStorageValue(value) {
+      return value && typeof value === "object" ? JSON.parse(JSON.stringify(value)) : value;
+    }
+
+    async function loadStoredData() {
+      if (!canUseExtensionStorage()) {
+        state = normalizeStoredState(readLocalStorageValue(STORAGE_KEY));
+        pageSize = normalizePageSize(readLocalStorageValue(PAGE_SIZE_KEY));
+        savedStudySideMode = normalizeStudySideMode(readLocalStorageValue(STUDY_SIDE_MODE_KEY));
+        return;
+      }
+
+      try {
+        storageBackend = "extension";
+
+        const stored = await chromeStorageGet([STORAGE_KEY, PAGE_SIZE_KEY, STUDY_SIDE_MODE_KEY]);
+        const migrated = {};
+
+        if (hasOwn(stored, STORAGE_KEY)) {
+          state = normalizeStoredState(stored[STORAGE_KEY]);
+        } else {
+          state = normalizeStoredState(readLocalStorageValue(STORAGE_KEY));
+          migrated[STORAGE_KEY] = state;
+        }
+
+        if (hasOwn(stored, PAGE_SIZE_KEY)) {
+          pageSize = normalizePageSize(stored[PAGE_SIZE_KEY]);
+        } else {
+          pageSize = normalizePageSize(readLocalStorageValue(PAGE_SIZE_KEY));
+          migrated[PAGE_SIZE_KEY] = pageSize;
+        }
+
+        if (hasOwn(stored, STUDY_SIDE_MODE_KEY)) {
+          savedStudySideMode = normalizeStudySideMode(stored[STUDY_SIDE_MODE_KEY]);
+        } else {
+          savedStudySideMode = normalizeStudySideMode(readLocalStorageValue(STUDY_SIDE_MODE_KEY));
+          if (savedStudySideMode) {
+            migrated[STUDY_SIDE_MODE_KEY] = savedStudySideMode;
+          }
+        }
+
+        if (Object.keys(migrated).length) {
+          await chromeStorageSet(migrated);
+        }
+      } catch (error) {
+        console.warn("Could not load extension storage, falling back to localStorage", error);
+        storageBackend = "local";
+        state = normalizeStoredState(readLocalStorageValue(STORAGE_KEY));
+        pageSize = normalizePageSize(readLocalStorageValue(PAGE_SIZE_KEY));
+        savedStudySideMode = normalizeStudySideMode(readLocalStorageValue(STUDY_SIDE_MODE_KEY));
+      }
+    }
+
+    function saveStoredValue(key, value) {
+      if (storageBackend === "extension") {
+        const snapshot = cloneStorageValue(value);
+
+        storageWriteQueue = storageWriteQueue
+          .catch(() => {})
+          .then(() => chromeStorageSet({ [key]: snapshot }))
+          .catch((error) => {
+            console.warn(`Could not save ${key} to extension storage`, error);
+          });
+
+        return storageWriteQueue;
+      }
+
+      writeLocalStorageValue(key, typeof value === "string" ? value : JSON.stringify(value));
+      return Promise.resolve();
+    }
+
     function saveState() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      return saveStoredValue(STORAGE_KEY, {
+        cards: state.cards,
+        tags: state.tags
+      });
     }
 
     function uid(prefix) {
@@ -1400,7 +1538,7 @@ function renderStudy() {
       els.pageSizeSelect.addEventListener("change", () => {
         const nextPageSize = Number(els.pageSizeSelect.value);
         pageSize = PAGE_SIZE_OPTIONS.includes(nextPageSize) ? nextPageSize : DEFAULT_PAGE_SIZE;
-        localStorage.setItem(PAGE_SIZE_KEY, String(pageSize));
+        saveStoredValue(PAGE_SIZE_KEY, pageSize);
         currentPage = 1;
         renderCardList();
       });
@@ -1420,13 +1558,12 @@ function renderStudy() {
         }
       });
 
-      const savedStudySideMode = localStorage.getItem(STUDY_SIDE_MODE_KEY);
       if (savedStudySideMode && els.studySideMode) {
         els.studySideMode.value = savedStudySideMode;
       }
 
       els.studySideMode.addEventListener("change", () => {
-        localStorage.setItem(STUDY_SIDE_MODE_KEY, els.studySideMode.value);
+        saveStoredValue(STUDY_SIDE_MODE_KEY, els.studySideMode.value);
       });
 
       els.studySessionMode.addEventListener("change", () => {
@@ -1576,7 +1713,16 @@ function renderStudy() {
       });
     }
 
-    bindEvents();
-    sortTags();
-    saveState();
-    renderAll();
+    async function initApp() {
+      await loadStoredData();
+      bindEvents();
+      sortTags();
+      await saveState();
+      renderAll();
+    }
+
+    initApp().catch((error) => {
+      console.warn("Could not initialize app", error);
+      renderAll();
+      showToast("Не вдалося завантажити дані. Спробуйте перезавантажити сторінку.");
+    });
