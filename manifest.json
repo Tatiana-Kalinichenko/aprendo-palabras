@@ -4,6 +4,10 @@
   "short_name": "Aprendo Español",
   "version": "1.0.1",
   "description": "Локальний додаток для створення і вивчення іноземних слів з тегами, CSV-імпортом та експортом.",
+  "permissions": [
+    "storage"
+  ],
+  "options_page": "app.html",
   "action": {
     "default_title": "Відкрити Aprendo Español",
     "default_icon": {
