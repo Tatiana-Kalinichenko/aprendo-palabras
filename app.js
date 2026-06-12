@@ -483,6 +483,42 @@ function canMoveToMode(ids, mode) {
   return currentOutsideSelection + movingIntoMode <= limit;
 }
 
+function getModeRank(mode) {
+  const rank = MODE_ORDER.indexOf(mode);
+  return rank >= 0 ? rank : MODE_ORDER.indexOf("dictionary");
+}
+
+function getHigherMode(firstMode, secondMode) {
+  return getModeRank(firstMode) >= getModeRank(secondMode) ? firstMode : secondMode;
+}
+
+function getImportModeFallbacks(mode) {
+  const modeIndex = getModeRank(mode);
+  return MODE_ORDER.slice(0, modeIndex + 1).reverse();
+}
+
+function canFitImportedMode(mode, ignoredCardId = null) {
+  const limit = getModeLimit(mode);
+  if (!Number.isFinite(limit)) return true;
+
+  const count = state.cards.filter((card) => card.mode === mode && card.id !== ignoredCardId).length;
+  return count < limit;
+}
+
+function resolveImportMode(mode, existingCard = null) {
+  const currentMode = existingCard?.mode || null;
+  const currentRank = currentMode ? getModeRank(currentMode) : getModeRank("dictionary");
+
+  for (const candidate of getImportModeFallbacks(mode)) {
+    if (getModeRank(candidate) < currentRank) break;
+    if (candidate === currentMode || canFitImportedMode(candidate, existingCard?.id || null)) {
+      return candidate;
+    }
+  }
+
+  return currentMode || "dictionary";
+}
+
 function getSelectedStudySessionMode() {
   const selectedMode = els.studySessionMode?.value;
   return STUDY_SESSION_CARD_MODES[selectedMode] ? selectedMode : "learning";
@@ -1286,6 +1322,69 @@ function renderStudy() {
         .filter(Boolean);
     }
 
+    function normalizeCsvCardSide(value) {
+      return String(value || "").trim();
+    }
+
+    function findImportedCardDuplicate(front, back) {
+      return state.cards.find((card) => (
+        normalizeCsvCardSide(card.front) === front
+        && normalizeCsvCardSide(card.back) === back
+      ));
+    }
+
+    function appendUniqueNotes(card, notes) {
+      const importedNotes = String(notes || "").trim();
+      if (!importedNotes) return false;
+
+      const currentNotes = String(card.notes || "").trim();
+      if (currentNotes.includes(importedNotes)) return false;
+
+      card.notes = currentNotes ? `${currentNotes}\n${importedNotes}` : importedNotes;
+      return true;
+    }
+
+    function mergeCardTagIds(card, tagIds) {
+      const currentTagIds = Array.isArray(card.tagIds) ? card.tagIds : [];
+      const mergedTagIds = Array.from(new Set([...currentTagIds, ...tagIds]));
+      const changed = mergedTagIds.length !== currentTagIds.length
+        || mergedTagIds.some((id, index) => id !== currentTagIds[index]);
+
+      if (changed) {
+        card.tagIds = mergedTagIds;
+      }
+
+      return changed;
+    }
+
+    function mergeImportedCardMetadata(card, importedCard) {
+      let changed = false;
+
+      if (appendUniqueNotes(card, importedCard.notes)) {
+        changed = true;
+      }
+
+      if (mergeCardTagIds(card, importedCard.tagIds)) {
+        changed = true;
+      }
+
+      const currentMode = card.mode || "dictionary";
+      const desiredMode = getHigherMode(currentMode, importedCard.mode || "dictionary");
+      const resolvedMode = resolveImportMode(desiredMode, card);
+      const modeLimited = getModeRank(resolvedMode) < getModeRank(desiredMode);
+
+      if (resolvedMode !== card.mode) {
+        card.mode = resolvedMode;
+        changed = true;
+      }
+
+      if (changed) {
+        card.updatedAt = new Date().toISOString();
+      }
+
+      return { changed, modeLimited };
+    }
+
     function getCsvColumnIndexes(headerRow) {
       const normalized = headerRow.map(normalizeHeader);
       const findAny = (names, fallback) => {
@@ -1323,46 +1422,43 @@ function renderStudy() {
       const dataRows = hasHeader ? rows.slice(1) : rows;
       let imported = 0;
       let skipped = 0;
-      let movedToDictionary = 0;
-
-      let plannedLearning = state.cards.filter((card) => card.mode === "learning").length;
-      let plannedReinforcement = state.cards.filter((card) => card.mode === "reinforcement").length;
+      let updatedDuplicates = 0;
+      let unchangedDuplicates = 0;
+      let limitedModeFallbacks = 0;
 
       for (const row of dataRows) {
-        const front = String(row[indexes.front] || "").trim();
-        const back = String(row[indexes.back] || "").trim();
+        const front = normalizeCsvCardSide(row[indexes.front]);
+        const back = normalizeCsvCardSide(row[indexes.back]);
 
         if (!front || !back) {
           skipped += 1;
           continue;
         }
 
-        let mode = mapCsvMode(row[indexes.mode] || "dictionary");
+        const requestedMode = mapCsvMode(row[indexes.mode] || "dictionary");
+        const notes = String(row[indexes.notes] || "").trim();
+        const tagIds = ensureTags(splitCsvTags(row[indexes.tags] || ""));
+        const duplicate = findImportedCardDuplicate(front, back);
 
-        if (mode === "learning") {
-          if (plannedLearning >= MAX_LEARNING) {
-            mode = "dictionary";
-            movedToDictionary += 1;
-          } else {
-            plannedLearning += 1;
-          }
+        if (duplicate) {
+          const result = mergeImportedCardMetadata(duplicate, { notes, tagIds, mode: requestedMode });
+          if (result.modeLimited) limitedModeFallbacks += 1;
+          if (result.changed) updatedDuplicates += 1;
+          else unchangedDuplicates += 1;
+          continue;
         }
 
-        if (mode === "reinforcement") {
-          if (plannedReinforcement >= MAX_REINFORCEMENT) {
-            mode = "dictionary";
-            movedToDictionary += 1;
-          } else {
-            plannedReinforcement += 1;
-          }
+        const mode = resolveImportMode(requestedMode);
+        if (getModeRank(mode) < getModeRank(requestedMode)) {
+          limitedModeFallbacks += 1;
         }
 
         state.cards.push({
           id: uid("card"),
           front,
           back,
-          notes: String(row[indexes.notes] || "").trim(),
-          tagIds: ensureTags(splitCsvTags(row[indexes.tags] || "")),
+          notes,
+          tagIds,
           mode,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
@@ -1370,20 +1466,24 @@ function renderStudy() {
         imported += 1;
       }
 
-      if (!imported) {
+      if (!imported && !updatedDuplicates && !unchangedDuplicates) {
         showToast("Не імпортовано жодної картки. Перевірте, чи заповнені перші дві колонки.");
         return;
       }
 
-      selectedIds.clear();
-      saveState();
-      renderAll();
+      if (imported || updatedDuplicates) {
+        selectedIds.clear();
+        saveState();
+        renderAll();
+      }
 
-      let message = `Імпортовано карток: ${imported}.`;
+      let message = imported ? `Імпортовано нових карток: ${imported}.` : "Нових карток не імпортовано.";
+      if (updatedDuplicates) message += ` Оновлено дублікатів: ${updatedDuplicates}.`;
+      if (unchangedDuplicates) message += ` Дублікатів без змін: ${unchangedDuplicates}.`;
       if (sourceEncoding) message += ` Кодування: ${sourceEncoding}.`;
       if (skipped) message += ` Пропущено рядків: ${skipped}.`;
-      if (movedToDictionary) {
-        message += ` ${movedToDictionary} карт. перенесено в Словник через ліміт режимів.`;
+      if (limitedModeFallbacks) {
+        message += ` ${limitedModeFallbacks} карт. розміщено в нижчий доступний режим через ліміт.`;
       }
       showToast(message);
     }
