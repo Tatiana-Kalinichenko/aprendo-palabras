@@ -39,6 +39,7 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
     let savedStudySideMode = null;
     let storageBackend = "local";
     let storageWriteQueue = Promise.resolve();
+    let storageSyncBound = false;
 
     const $ = (selector) => document.querySelector(selector);
 
@@ -248,6 +249,19 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       return saveStoredValue(STORAGE_KEY, {
         cards: state.cards,
         tags: state.tags
+      });
+    }
+
+    function bindExternalStorageSync() {
+      if (storageSyncBound || storageBackend !== "extension" || !chrome.storage?.onChanged) return;
+
+      storageSyncBound = true;
+      chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName !== "local" || !changes[STORAGE_KEY]) return;
+
+        state = normalizeStoredState(changes[STORAGE_KEY].newValue);
+        sortTags();
+        renderAll();
       });
     }
 
@@ -1819,6 +1833,7 @@ function renderStudy() {
       sortTags();
       await saveState();
       renderAll();
+      bindExternalStorageSync();
     }
 
     initApp().catch((error) => {

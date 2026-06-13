@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Нова картка — Aprendo Palabras</title>
+  <link rel="stylesheet" href="context-card.css" />
+  <script src="context-card.js" defer></script>
+</head>
+<body>
+  <main class="context-card-app">
+    <form class="card-panel" id="cardForm">
+      <header class="popup-head">
+        <div class="title-group">
+          <img class="app-icon" src="icons/icon48.png" alt="" />
+          <h1>Нова картка</h1>
+        </div>
+        <button class="close-button" id="closeBtn" type="button" aria-label="Закрити">×</button>
+      </header>
+
+      <label for="cardFront">Сторона 1</label>
+      <textarea id="cardFront" rows="2" autocomplete="off"></textarea>
+
+      <div class="swap-row">
+        <button class="swap-button" id="swapSides" type="button">
+          <span aria-hidden="true">⇅</span>
+          Поміняти сторони
+        </button>
+      </div>
+
+      <label for="cardBack">Сторона 2</label>
+      <textarea id="cardBack" rows="2" autocomplete="off"></textarea>
+
+      <section class="field-block" aria-labelledby="accentTitle">
+        <h2 id="accentTitle">Швидкі символи</h2>
+        <div class="accent-row">
+          <button type="button" data-char="á">á</button>
+          <button type="button" data-char="é">é</button>
+          <button type="button" data-char="í">í</button>
+          <button type="button" data-char="ó">ó</button>
+          <button type="button" data-char="ú">ú</button>
+          <button type="button" data-char="ñ">ñ</button>
+          <button type="button" data-char="¿">¿</button>
+          <button type="button" data-char="¡">¡</button>
+        </div>
+      </section>
+
+      <section class="field-block" aria-labelledby="tagsTitle">
+        <h2 id="tagsTitle">Теги</h2>
+        <div class="tag-combobox">
+          <button class="tag-trigger" id="tagDropdownButton" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="tagDropdownLabel">Оберіть або створіть теги</span>
+            <span class="chevron" aria-hidden="true">⌄</span>
+          </button>
+          <div class="tag-dropdown" id="tagDropdown" hidden>
+            <input id="tagSearch" type="text" placeholder="Пошук або новий тег" autocomplete="off" />
+            <div class="tag-options" id="tagOptions" role="listbox" aria-multiselectable="true"></div>
+            <button class="create-tag" id="createTagButton" type="button" hidden></button>
+          </div>
+        </div>
+        <div class="selected-tags" id="selectedTags"></div>
+      </section>
+
+      <label for="cardNotes">Примітка</label>
+      <textarea id="cardNotes" rows="3" placeholder="Наприклад, синонім або форма слова"></textarea>
+
+      <p class="length-warning" id="lengthWarning" hidden></p>
+      <p class="form-message" id="formMessage" role="status" aria-live="polite"></p>
+
+      <button class="create-button" id="createCardBtn" type="submit">Створити картку</button>
+    </form>
+  </main>
+</body>
+</html>
