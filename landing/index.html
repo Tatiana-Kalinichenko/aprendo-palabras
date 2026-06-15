@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aprendo palabras - Chrome extension</title>
+    <meta
+      name="description"
+      content="Aprendo palabras допомагає створювати власні словникові картки, повторювати слова й закріплювати їх у пам'яті."
+    >
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg?v=2">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="#" aria-label="Aprendo palabras">
+          <img class="brand__icon" src="assets/app-icon.png" alt="">
+          <span>Aprendo palabras</span>
+        </a>
+
+        <nav class="main-nav" aria-label="Основна навігація">
+          <a href="#benefits">Переваги</a>
+          <a href="#features">Можливості</a>
+          <a href="#how-it-works">Як працює</a>
+        </nav>
+
+        <a class="header-button" href="https://chromewebstore.google.com/detail/aprendo-espa%C3%B1ol-cards/gnejekdpadcfeadedlinhjobbhigabhm">Встановити</a>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero__content">
+            <p class="pill">
+              <span class="pill__dot" aria-hidden="true"></span>
+              Chrome extension для власного словника
+            </p>
+
+            <h1 id="hero-title">
+              <span>Вивчай іноземні</span>
+              <span>слова прямо</span>
+              <span>у браузері</span>
+            </h1>
+
+            <p class="hero__lead">
+              Aprendo palabras допомагає створювати власні словникові картки,
+              повторювати слова й поступово закріплювати їх у пам'яті.
+            </p>
+
+            <div class="hero__actions">
+              <a class="button button--primary" href="https://chromewebstore.google.com/detail/aprendo-espa%C3%B1ol-cards/gnejekdpadcfeadedlinhjobbhigabhm">
+                <span class="chrome-mark" aria-hidden="true"></span>
+                Встановити з Chrome Web Store
+              </a>
+              <a class="button button--secondary" href="#how-it-works">Як це працює</a>
+            </div>
+          </div>
+
+          <div class="hero-preview" aria-label="Попередній вигляд Aprendo palabras">
+            <div class="window-dots" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+
+            <div class="extension-window">
+              <div class="extension-window__top">
+                <div class="mini-brand">
+                  <img src="assets/app-icon.png" alt="">
+                  <strong>Aprendo palabras</strong>
+                </div>
+
+                <div class="mode-switch" aria-label="Режими">
+                  <span class="mode-switch__active">Вивчення</span>
+                  <span>Повтор</span>
+                </div>
+              </div>
+
+              <div class="word-stage" aria-hidden="true">
+                <img class="word-card word-card--left" src="assets/word-card-foreign.svg" alt="">
+                <img class="word-card word-card--center" src="assets/word-card-translation.svg" alt="">
+                <img class="word-card word-card--right" src="assets/word-card-tags.svg" alt="">
+              </div>
+
+              <div class="progress-lines" aria-hidden="true">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section section--benefits" id="benefits" aria-labelledby="benefits-title">
+          <p class="section-kicker">Переваги</p>
+          <h2 id="benefits-title">Наші переваги</h2>
+          <p class="section-lead">
+            Усе продумано так, щоб додавати й повторювати слова було легко з
+            першого дня.
+          </p>
+
+          <div class="benefits-grid">
+            <article class="benefit-card">
+              <img class="benefit-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
+              <h3>Простий інтерфейс</h3>
+              <p>
+                Усі основні функції під рукою: додавання карток, режими вивчення
+                та повторення без складних налаштувань.
+              </p>
+            </article>
+
+            <article class="benefit-card benefit-card--context">
+              <img class="benefit-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
+              <h3>Додавання слів із сайтів</h3>
+              <p>
+                Виділіть слово або фразу на сторінці, відкрийте контекстне меню й
+                одразу створіть нову картку.
+              </p>
+
+              <div class="context-demo" aria-hidden="true">
+                <div class="context-page">
+                  <span>Hoy aprendemos palabras nuevas para viajar.</span>
+                  <span>El pronóstico anuncia <mark>lluvia</mark> por la tarde.</span>
+                  <span>Guarda las frases útiles en tu lista.</span>
+                </div>
+                <div class="context-menu">
+                  <span>Копіювати</span>
+                  <strong>Створити картку — Aprendo Palabras</strong>
+                  <span>Пошук у Google</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="benefit-card">
+              <img class="benefit-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
+              <h3>Без зайвого клопоту</h3>
+              <p>
+                Без логінів, без реклами, без складного старту — просто
+                встановіть розширення і починайте користуватися.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="section section--features" id="features" aria-labelledby="features-title">
+          <p class="section-kicker">Можливості</p>
+          <h2 id="features-title">Усе потрібне для простих словникових карток</h2>
+
+          <div class="features-grid">
+            <article class="feature-tile">
+              <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
+              <div>
+                <h3>Створення власних карток</h3>
+                <p>Вводиш слово, переклад, тег і додаткові позначки.</p>
+              </div>
+            </article>
+
+            <article class="feature-tile">
+              <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
+              <div>
+                <h3>Режими вивчення</h3>
+                <p>Обирай етапи для нових, знайомих і вже вивчених слів.</p>
+              </div>
+            </article>
+
+            <article class="feature-tile">
+              <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
+              <div>
+                <h3>Повтор уже знайомих слів</h3>
+                <p>Повертаєшся до уроків, які не хочеться втратити з пам'яті.</p>
+              </div>
+            </article>
+
+            <article class="feature-tile">
+              <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
+              <div>
+                <h3>Імпорт CSV</h3>
+                <p>Можна завантажити готовий список слів у потрібному форматі.</p>
+              </div>
+            </article>
+
+            <article class="feature-tile">
+              <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
+              <div>
+                <h3>Робота у Chrome</h3>
+                <p>Додаток відкривається прямо в браузері, без окремої програми.</p>
+              </div>
+            </article>
+
+            <article class="feature-tile">
+              <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
+              <div>
+                <h3>Український інтерфейс</h3>
+                <p>Меню, режими й підказки написані українською.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="section section--steps" id="how-it-works" aria-labelledby="steps-title">
+          <p class="section-kicker">Як працює</p>
+          <h2 id="steps-title">Три кроки — і словник уже з тобою</h2>
+
+          <div class="steps-grid">
+            <article class="step-card">
+              <img class="step-icon" src="assets/icon-add-card.svg" alt="" aria-hidden="true">
+              <div>
+                <h3>Додай картки</h3>
+                <p>Наповни словник іноземними словами з перекладом, примітками та тегом.</p>
+              </div>
+              <span class="step-number">1</span>
+            </article>
+
+            <article class="step-card">
+              <img class="step-icon" src="assets/icon-repeat.svg" alt="" aria-hidden="true">
+              <div>
+                <h3>Обирай слова для вивчення</h3>
+                <p>Перенеси обрані слова в режим Вивчення і повторюй їх для запам’ятовування.</p>
+              </div>
+              <span class="step-number">2</span>
+            </article>
+
+            <article class="step-card">
+              <img class="step-icon" src="assets/icon-done.svg" alt="" aria-hidden="true">
+              <div>
+                <h3>Збирай словник</h3>
+                <p>Переміщуй вивчені слова в категорію "Знаю", створюючи свій особистий лексикон.</p>
+              </div>
+              <span class="step-number">3</span>
+            </article>
+          </div>
+
+          <div class="bottom-cta">
+            <div>
+              <h2>Спробуй Aprendo palabras у своєму браузері</h2>
+              <p>
+                Додай розширення в Chrome і почни збирати власний словник уже
+                сьогодні.
+              </p>
+            </div>
+
+            <a class="button button--primary" href="https://chromewebstore.google.com/detail/aprendo-espa%C3%B1ol-cards/gnejekdpadcfeadedlinhjobbhigabhm">
+              <span class="chrome-mark" aria-hidden="true"></span>
+              Встановити з Chrome Web Store
+            </a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <span>Landing design mockup • HTML • PNG preview</span>
+        <span>Aprendo palabras</span>
+      </footer>
+    </div>
+  </body>
+</html>
