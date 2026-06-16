@@ -140,6 +140,17 @@
       box-shadow: none;
     }
 
+    .secondary:disabled,
+    .ghost:disabled,
+    .danger:disabled,
+    .mini:disabled,
+    .chip-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.52;
+      transform: none;
+      box-shadow: none;
+    }
+
     .secondary {
       background: var(--ink);
       color: #fff;
@@ -856,6 +867,15 @@
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.study-pip-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.study-pip-button {
+  min-width: 136px;
 }
 
 .study-nav-icon {

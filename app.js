@@ -32,6 +32,9 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
     let study = null;
     let studyHistory = [];
     let studyDeck = createEmptyStudyDeck();
+    let studyPipWindow = null;
+    let studyPipOpening = false;
+    let studyPipNoticeTimer = null;
     let toastTimer = null;
 
     let currentPage = 1;
@@ -587,6 +590,7 @@ function getSelectedStudySessionMode() {
       window.clearTimeout(toastTimer);
       els.toast.textContent = message;
       els.toast.classList.add("show");
+      showStudyPictureInPictureToast(message);
       toastTimer = window.setTimeout(() => {
         els.toast.classList.remove("show");
       }, 2600);
@@ -857,39 +861,84 @@ function getSelectedStudySessionMode() {
      els.closeStudyBtn.style.display = study ? "block" : "none";
     }
 
-function renderStudy() {
-  if (!study) {
-    els.studyPanel.classList.remove("active");
-    els.studyPanel.innerHTML = "";
-    return;
+function canUseDocumentPictureInPicture() {
+  return Boolean(window.documentPictureInPicture?.requestWindow);
+}
+
+function getStudyPictureInPictureWindow() {
+  const apiWindow = window.documentPictureInPicture?.window || null;
+  const pipWindow = apiWindow || studyPipWindow;
+
+  if (pipWindow && !pipWindow.closed) {
+    studyPipWindow = pipWindow;
+    return pipWindow;
   }
+
+  studyPipWindow = null;
+  return null;
+}
+
+function getStudyAnswerElement(sourceDocument = document) {
+  return sourceDocument.querySelector("[data-study-answer]") || sourceDocument.querySelector("#studyAnswer");
+}
+
+function syncStudyAnswerFromDocument(sourceDocument = document) {
+  if (!study) return;
+
+  const answerEl = getStudyAnswerElement(sourceDocument);
+  if (answerEl) study.answer = answerEl.value;
+}
+
+function syncStudyAnswerToMain() {
+  if (!study) return;
+
+  const answerEl = getStudyAnswerElement(document);
+  if (answerEl && answerEl.value !== study.answer) {
+    answerEl.value = study.answer;
+  }
+}
+
+function syncStudyAnswerToPictureInPicture() {
+  if (!study) return;
+
+  const pipWindow = getStudyPictureInPictureWindow();
+  const answerEl = pipWindow ? getStudyAnswerElement(pipWindow.document) : null;
+  if (answerEl && answerEl.value !== study.answer) {
+    answerEl.value = study.answer;
+  }
+}
+
+function getStudyDisplayData() {
+  if (!study) return null;
 
   const sessionMode = STUDY_SESSION_CARD_MODES[study.sessionMode] ? study.sessionMode : "learning";
   const cardMode = getStudyCardMode(sessionMode);
   const card = state.cards.find((item) => item.id === study.cardId);
 
-  if (!card || card.mode !== cardMode) {
-    pickStudyCard(study.cardId, { rememberCurrent: false, sessionMode });
-    return;
-  }
+  if (!card || card.mode !== cardMode) return null;
 
-  els.studyPanel.classList.add("active");
-
+  const side = study.side === "back" ? "back" : "front";
   const showingSide = study.flipped
-    ? (study.side === "front" ? "back" : "front")
-    : study.side;
+    ? (side === "front" ? "back" : "front")
+    : side;
 
-  const label = showingSide === "front"
-    ? "Сторона 1 — українською"
-    : "Сторона 2 — іспанською";
+  return {
+    sessionMode,
+    cardMode,
+    card,
+    showingSide,
+    label: showingSide === "front"
+      ? "Сторона 1 — українською"
+      : "Сторона 2 — іспанською",
+    text: showingSide === "front" ? card.front : card.back,
+    notesHtml: showingSide === "back" && card.notes
+      ? `<div class="study-notes">${multiline(card.notes)}</div>`
+      : ""
+  };
+}
 
-  const text = showingSide === "front" ? card.front : card.back;
-
-  const notesHtml = showingSide === "back" && card.notes
-    ? `<div class="study-notes">${multiline(card.notes)}</div>`
-    : "";
-
-  const modeControls = sessionMode === "reinforcement"
+function getStudyModeControls(sessionMode) {
+  return sessionMode === "reinforcement"
     ? `
       <button class="mini blue" data-study-action="dictionary" type="button">&lt;- Словник</button>
       <button class="mini" data-study-action="learning" type="button">&lt;- Вчити</button>
@@ -899,11 +948,481 @@ function renderStudy() {
       <button class="mini blue" data-study-action="dictionary" type="button">&lt;- Словник</button>
       <button class="mini good" data-study-action="reinforcement" type="button">Закріпити -&gt;</button>
     `;
+}
+
+function getStudyPipButtonHtml() {
+  const unsupportedTitle = "Міні-вікно доступне тільки в Google Chrome desktop з Document Picture-in-Picture.";
+
+  if (!canUseDocumentPictureInPicture()) {
+    return `<button class="mini study-pip-button" data-study-pip-button type="button" disabled title="${unsupportedTitle}">Міні-вікно</button>`;
+  }
+
+  const isOpen = Boolean(getStudyPictureInPictureWindow());
+  const label = studyPipOpening ? "Відкриваємо..." : isOpen ? "Міні-вікно відкрите" : "Міні-вікно";
+  const title = isOpen ? "Міні-вікно вже відкрите" : "Відкрити поточну картку в міні-вікні";
+  const disabled = studyPipOpening ? " disabled" : "";
+
+  return `<button class="mini study-pip-button" data-study-action="open-pip" data-study-pip-button type="button" title="${title}"${disabled}>${label}</button>`;
+}
+
+function updateStudyPictureInPictureButton() {
+  const button = els.studyPanel.querySelector("[data-study-pip-button]");
+  if (!button) return;
+
+  if (!canUseDocumentPictureInPicture()) {
+    button.disabled = true;
+    button.title = "Міні-вікно доступне тільки в Google Chrome desktop з Document Picture-in-Picture.";
+    button.textContent = "Міні-вікно";
+    return;
+  }
+
+  const isOpen = Boolean(getStudyPictureInPictureWindow());
+  button.disabled = studyPipOpening;
+  button.textContent = studyPipOpening ? "Відкриваємо..." : isOpen ? "Міні-вікно відкрите" : "Міні-вікно";
+  button.title = isOpen ? "Міні-вікно вже відкрите" : "Відкрити поточну картку в міні-вікні";
+}
+
+function getStudyPictureInPictureStyles() {
+  return `
+    :root {
+      color-scheme: light;
+      --bg: #fff8f0;
+      --panel: #ffffff;
+      --ink: #27211f;
+      --muted: #7a6e68;
+      --line: #ead8c9;
+      --soft: #f8efe6;
+      --accent: #d55f3f;
+      --accent-dark: #a9402a;
+      --green: #2e7d59;
+      --green-soft: #dff4e9;
+      --blue: #3b65a7;
+      --blue-soft: #e3ebfb;
+      --danger: #b73232;
+      --danger-soft: #ffe2e2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 300px;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.52;
+    }
+
+    .study-pip-root {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .study-pip-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .study-pip-title {
+      font-weight: 850;
+      color: var(--accent-dark);
+    }
+
+    .study-pip-window-actions,
+    .study-icon-row,
+    .study-mode-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .study-pip-card {
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      padding: 22px 18px;
+      text-align: center;
+      box-shadow: inset 0 0 0 6px rgba(255, 248, 240, 0.88);
+    }
+
+    .side-label {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .study-pip-word {
+      margin: 0;
+      font-size: 2.5rem;
+      line-height: 1.05;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .study-notes {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    .study-pip-answer-label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+    }
+
+    .study-pip-answer {
+      width: 100%;
+      min-height: 76px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      color: var(--ink);
+      padding: 10px 12px;
+    }
+
+    .mini,
+    .primary,
+    .ghost {
+      border: 0;
+      border-radius: 999px;
+      font-weight: 800;
+    }
+
+    .mini {
+      padding: 7px 11px;
+      background: var(--soft);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      font-size: 0.82rem;
+    }
+
+    .mini.good {
+      background: var(--green-soft);
+      color: var(--green);
+    }
+
+    .mini.blue {
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .mini.danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .primary,
+    .ghost {
+      width: 42px;
+      height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .ghost {
+      background: var(--soft);
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+
+    .study-pip-toast {
+      position: fixed;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: var(--ink);
+      color: #fff;
+      text-align: center;
+      font-weight: 780;
+      opacity: 0;
+      transform: translateY(18px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      pointer-events: none;
+    }
+
+    .study-pip-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 340px) {
+      .study-pip-word {
+        font-size: 2rem;
+      }
+    }
+  `;
+}
+
+function setupStudyPictureInPictureWindow(pipWindow) {
+  const pipDocument = pipWindow.document;
+  pipDocument.documentElement.lang = "uk";
+  pipDocument.title = "Aprendo Palabras - міні-вікно";
+  pipDocument.head.innerHTML = "";
+  pipDocument.body.innerHTML = "";
+  pipDocument.body.className = "study-pip-body";
+
+  const meta = pipDocument.createElement("meta");
+  meta.name = "viewport";
+  meta.content = "width=device-width, initial-scale=1";
+  pipDocument.head.append(meta);
+
+  const style = pipDocument.createElement("style");
+  style.textContent = getStudyPictureInPictureStyles();
+  pipDocument.head.append(style);
+
+  const root = pipDocument.createElement("main");
+  root.className = "study-pip-root";
+  root.setAttribute("data-study-pip-root", "");
+  pipDocument.body.append(root);
+
+  const toast = pipDocument.createElement("div");
+  toast.className = "study-pip-toast";
+  toast.setAttribute("data-pip-toast", "");
+  pipDocument.body.append(toast);
+
+  pipDocument.addEventListener("click", (event) => {
+    const pipButton = event.target.closest("[data-pip-action]");
+    if (pipButton?.dataset.pipAction === "return") {
+      returnToStudyTabFromPictureInPicture();
+      return;
+    }
+
+    if (pipButton?.dataset.pipAction === "close") {
+      closeStudyPictureInPicture();
+      return;
+    }
+
+    const studyButton = event.target.closest("[data-study-action]");
+    if (studyButton) {
+      handleStudyAction(studyButton.dataset.studyAction, {
+        sourceDocument: pipDocument,
+        scroll: false
+      });
+    }
+  });
+
+  pipDocument.addEventListener("input", (event) => {
+    if (event.target.matches("[data-study-answer]") && study) {
+      study.answer = event.target.value;
+      syncStudyAnswerToMain();
+    }
+  });
+}
+
+function showStudyPictureInPictureToast(message) {
+  const pipWindow = getStudyPictureInPictureWindow();
+  const toast = pipWindow?.document.querySelector("[data-pip-toast]");
+  if (!toast) return;
+
+  window.clearTimeout(studyPipNoticeTimer);
+  toast.textContent = message;
+  toast.classList.add("show");
+  studyPipNoticeTimer = window.setTimeout(() => {
+    if (!pipWindow.closed) {
+      toast.classList.remove("show");
+    }
+  }, 2600);
+}
+
+function renderStudyPictureInPicture() {
+  const pipWindow = getStudyPictureInPictureWindow();
+  if (!pipWindow) return;
+
+  const data = getStudyDisplayData();
+  if (!data) {
+    closeStudyPictureInPicture();
+    return;
+  }
+
+  const pipDocument = pipWindow.document;
+  const root = pipDocument.querySelector("[data-study-pip-root]");
+  if (!root) {
+    setupStudyPictureInPictureWindow(pipWindow);
+    renderStudyPictureInPicture();
+    return;
+  }
+
+  root.innerHTML = `
+    <header class="study-pip-header">
+      <div class="study-pip-title">Aprendo Palabras</div>
+      <div class="study-pip-window-actions">
+        <button class="mini" data-pip-action="return" type="button" title="Повернутись до режиму вивчення у вкладці">У вкладку</button>
+        <button class="mini danger" data-pip-action="close" type="button" title="Закрити міні-вікно">Закрити</button>
+      </div>
+    </header>
+
+    <section class="study-pip-card">
+      <p class="side-label">${escapeHtml(data.label)}</p>
+      <p class="study-pip-word">${multiline(data.text)}</p>
+      ${data.notesHtml}
+    </section>
+
+    <label class="study-pip-answer-label" for="studyPipAnswer">Ваш переклад</label>
+    <textarea id="studyPipAnswer" class="study-pip-answer" data-study-answer placeholder="Поле необовʼязкове">${escapeHtml(study.answer)}</textarea>
+
+    <div class="study-icon-row">
+      <button class="ghost" data-study-action="previous" type="button" aria-label="Попередня картка" title="Попередня картка">←</button>
+      <button class="primary" data-study-action="flip" type="button" aria-label="Перевернути" title="Перевернути">↻</button>
+      <button class="ghost" data-study-action="next" type="button" aria-label="Наступна картка" title="Наступна картка">→</button>
+    </div>
+
+    <div class="study-mode-row">
+      ${getStudyModeControls(data.sessionMode)}
+    </div>
+  `;
+
+  updateStudyPictureInPictureButton();
+}
+
+async function openStudyPictureInPicture() {
+  if (!study) return;
+
+  if (!canUseDocumentPictureInPicture()) {
+    showToast("Міні-вікно доступне тільки в Google Chrome desktop.");
+    return;
+  }
+
+  const existingWindow = getStudyPictureInPictureWindow();
+  if (existingWindow) {
+    renderStudyPictureInPicture();
+    try {
+      existingWindow.focus();
+    } catch (error) {
+      console.warn("Could not focus Picture-in-Picture window", error);
+    }
+    return;
+  }
+
+  if (studyPipOpening) return;
+
+  studyPipOpening = true;
+  updateStudyPictureInPictureButton();
+
+  try {
+    const pipWindow = await window.documentPictureInPicture.requestWindow({
+      width: 380,
+      height: 560,
+      disallowReturnToOpener: true
+    });
+
+    studyPipWindow = pipWindow;
+    setupStudyPictureInPictureWindow(pipWindow);
+    renderStudyPictureInPicture();
+
+    pipWindow.addEventListener("pagehide", () => {
+      if (studyPipWindow === pipWindow) {
+        studyPipWindow = null;
+      }
+      studyPipOpening = false;
+      window.clearTimeout(studyPipNoticeTimer);
+      updateStudyPictureInPictureButton();
+    }, { once: true });
+  } catch (error) {
+    console.warn("Could not open Document Picture-in-Picture window", error);
+    showToast("Не вдалося відкрити міні-вікно. Спробуйте ще раз після кліку.");
+  } finally {
+    studyPipOpening = false;
+    updateStudyPictureInPictureButton();
+  }
+}
+
+function closeStudyPictureInPicture() {
+  const pipWindow = getStudyPictureInPictureWindow();
+  if (!pipWindow) {
+    updateStudyPictureInPictureButton();
+    return;
+  }
+
+  try {
+    pipWindow.close();
+  } catch (error) {
+    console.warn("Could not close Picture-in-Picture window", error);
+  }
+}
+
+function returnToStudyTabFromPictureInPicture() {
+  if (study) {
+    els.studyPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  try {
+    window.focus();
+  } catch (error) {
+    console.warn("Could not focus opener window", error);
+  }
+
+  closeStudyPictureInPicture();
+}
+
+function renderStudy() {
+  if (!study) {
+    els.studyPanel.classList.remove("active");
+    els.studyPanel.innerHTML = "";
+    closeStudyPictureInPicture();
+    return;
+  }
+
+  const sessionMode = STUDY_SESSION_CARD_MODES[study.sessionMode] ? study.sessionMode : "learning";
+  const data = getStudyDisplayData();
+
+  if (!data) {
+    pickStudyCard(study.cardId, { rememberCurrent: false, sessionMode });
+    return;
+  }
+
+  els.studyPanel.classList.add("active");
 
   const controls = `
+    <div class="study-pip-row">
+      ${getStudyPipButtonHtml()}
+    </div>
+
     <label for="studyAnswer">Ваш переклад, якщо хочете перевірити себе</label>
 
-    <textarea id="studyAnswer" class="answer-box" placeholder="Поле необовʼязкове. Напишіть переклад і натисніть кнопку перевороту.">${escapeHtml(study.answer)}</textarea>
+    <textarea id="studyAnswer" class="answer-box" data-study-answer placeholder="Поле необовʼязкове. Напишіть переклад і натисніть кнопку перевороту.">${escapeHtml(study.answer)}</textarea>
 
     <div class="study-icon-row">
       <button class="ghost icon-btn study-nav-icon" data-study-action="previous" type="button" aria-label="Попередня картка" title="Попередня картка">←</button>
@@ -916,21 +1435,21 @@ function renderStudy() {
     </div>
 
     <div class="study-mode-row">
-      ${modeControls}
+      ${getStudyModeControls(data.sessionMode)}
     </div>
   `;
 
   els.studyPanel.innerHTML = `
     <div class="study-layout">
       <div class="flashcard">
-        <p class="side-label">${escapeHtml(label)}</p>
-        <p class="card-word">${multiline(text)}</p>
-        ${notesHtml}
+        <p class="side-label">${escapeHtml(data.label)}</p>
+        <p class="card-word">${multiline(data.text)}</p>
+        ${data.notesHtml}
       </div>
 
       <div class="study-controls">
         <div>
-          <h2 class="study-title">Режим: ${escapeHtml(getStudySessionLabel(sessionMode))}</h2>
+          <h2 class="study-title">Режим: ${escapeHtml(getStudySessionLabel(data.sessionMode))}</h2>
           <p class="hint study-hint">Категорії тут не показуються, щоб не підказувати відповідь.</p>
         </div>
 
@@ -938,6 +1457,8 @@ function renderStudy() {
       </div>
     </div>
   `;
+
+  renderStudyPictureInPicture();
 }
 
     function getCheckedTagIds(container) {
@@ -1609,8 +2130,13 @@ function renderStudy() {
       setStudyCard(card, { ...options, sessionMode });
     }
 
-    function handleStudyAction(action) {
+    function handleStudyAction(action, options = {}) {
   if (!study) return;
+
+  if (action === "open-pip") {
+    openStudyPictureInPicture();
+    return;
+  }
 
   const sessionMode = STUDY_SESSION_CARD_MODES[study.sessionMode] ? study.sessionMode : getSelectedStudySessionMode();
   const cardMode = getStudyCardMode(sessionMode);
@@ -1618,8 +2144,7 @@ function renderStudy() {
 
   if (!card) return;
 
-  const answerEl = $("#studyAnswer");
-  if (answerEl) study.answer = answerEl.value;
+  syncStudyAnswerFromDocument(options.sourceDocument || document);
 
   if (action === "flip") {
     study.flipped = !study.flipped;
@@ -1628,7 +2153,10 @@ function renderStudy() {
   }
 
   if (action === "next") {
-    pickStudyCard(study.cardId, { sessionMode });
+    pickStudyCard(study.cardId, {
+      sessionMode,
+      scroll: options.scroll !== false
+    });
     return;
   }
 
@@ -1638,7 +2166,11 @@ function renderStudy() {
       const previousCard = state.cards.find((item) => item.id === previousId && item.mode === cardMode);
 
       if (previousCard) {
-        setStudyCard(previousCard, { rememberCurrent: false, sessionMode });
+        setStudyCard(previousCard, {
+          rememberCurrent: false,
+          sessionMode,
+          scroll: options.scroll !== false
+        });
         return;
       }
     }
@@ -1658,7 +2190,11 @@ function renderStudy() {
 
     saveState();
 
-    pickStudyCard(card.id, { rememberCurrent: false, sessionMode });
+    pickStudyCard(card.id, {
+      rememberCurrent: false,
+      sessionMode,
+      scroll: options.scroll !== false
+    });
 
     showToast(`Картку переміщено в “${MODE_LABELS[action]}”.`);
     return;
@@ -1876,8 +2412,9 @@ function renderStudy() {
       });
 
       els.studyPanel.addEventListener("input", (event) => {
-        if (event.target.id === "studyAnswer" && study) {
+        if (event.target.matches("[data-study-answer]") && study) {
           study.answer = event.target.value;
+          syncStudyAnswerToPictureInPicture();
         }
       });
 
