@@ -146,15 +146,32 @@ input[type="text"]:focus {
 .close-button {
   width: 44px;
   height: 44px;
+  flex: 0 0 44px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: rgba(255, 248, 240, 0.7);
   color: var(--ink);
-  font-size: 2rem;
-  line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.close-button:hover {
+  border-color: #f0c7b5;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+
+.close-icon {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+  pointer-events: none;
 }
 
 .swap-row {
