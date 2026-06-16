@@ -14,6 +14,8 @@ const els = {
   closeBtn: $("#closeBtn"),
   front: $("#cardFront"),
   back: $("#cardBack"),
+  frontSuggestions: $("#cardFrontSuggestions"),
+  backSuggestions: $("#cardBackSuggestions"),
   notes: $("#cardNotes"),
   swapSides: $("#swapSides"),
   tagDropdownButton: $("#tagDropdownButton"),
@@ -160,6 +162,49 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function normalizeSideSuggestionText(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("uk");
+}
+
+function getSideSuggestionMatches(side, value) {
+  const query = normalizeSideSuggestionText(value);
+  if (!query) return [];
+
+  return state.cards.filter((card) => {
+    const sideText = side === "front" ? card.front : card.back;
+    return normalizeSideSuggestionText(sideText).startsWith(query);
+  });
+}
+
+function renderSideSuggestionList(container, matches) {
+  if (!container) return;
+
+  if (!matches.length) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+
+  container.hidden = false;
+  container.innerHTML = matches.map((card) => `
+    <div class="side-suggestion">${escapeHtml(card.front)} &mdash; ${escapeHtml(card.back)}</div>
+  `).join("");
+}
+
+function renderSideSuggestions() {
+  renderSideSuggestionList(
+    els.frontSuggestions,
+    getSideSuggestionMatches("front", els.front.value)
+  );
+  renderSideSuggestionList(
+    els.backSuggestions,
+    getSideSuggestionMatches("back", els.back.value)
+  );
+}
+
 function sortTags() {
   state.tags.sort((a, b) => a.name.localeCompare(b.name, "uk", { sensitivity: "base" }));
 }
@@ -219,6 +264,7 @@ function setInitialSelectionText(text) {
   }
 
   updateLengthWarning();
+  renderSideSuggestions();
 }
 
 async function readPendingSelectionText() {
@@ -386,6 +432,7 @@ function swapSides() {
   els.front.value = els.back.value;
   els.back.value = front;
   updateLengthWarning();
+  renderSideSuggestions();
 }
 
 function insertAtCursor(input, char) {
@@ -395,6 +442,7 @@ function insertAtCursor(input, char) {
   input.focus();
   input.setSelectionRange(start + char.length, start + char.length);
   updateLengthWarning();
+  input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 function bindEvents() {
@@ -408,8 +456,10 @@ function bindEvents() {
     });
     input.addEventListener("input", () => {
       updateLengthWarning();
+      renderSideSuggestions();
       setMessage("");
     });
+    input.addEventListener("change", renderSideSuggestions);
   });
 
   els.notes.addEventListener("input", () => setMessage(""));
@@ -457,6 +507,9 @@ async function init() {
   renderTagDropdown();
   bindEvents();
   setInitialSelectionText(await readPendingSelectionText());
+  renderSideSuggestions();
+  window.requestAnimationFrame(renderSideSuggestions);
+  window.setTimeout(renderSideSuggestions, 250);
 }
 
 init().catch((error) => {

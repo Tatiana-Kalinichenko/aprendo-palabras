@@ -56,9 +56,11 @@
           <form id="createCardForm">
             <label for="cardFront">Сторона 1 — слово українською</label>
             <textarea id="cardFront" required placeholder="Наприклад: говорити"></textarea>
+            <div class="side-suggestions" id="cardFrontSuggestions" hidden></div>
 
             <label for="cardBack">Сторона 2 — переклад іспанською</label>
             <textarea id="cardBack" required placeholder="Наприклад: hablar"></textarea>
+            <div class="side-suggestions" id="cardBackSuggestions" hidden></div>
             <div class="accent-row" aria-label="Іспанські символи для перекладу">
               <button type="button" data-target="cardBack" data-char="á">á</button>
               <button type="button" data-target="cardBack" data-char="é">é</button>

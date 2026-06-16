@@ -56,6 +56,8 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       createCardForm: $("#createCardForm"),
       cardFront: $("#cardFront"),
       cardBack: $("#cardBack"),
+      cardFrontSuggestions: $("#cardFrontSuggestions"),
+      cardBackSuggestions: $("#cardBackSuggestions"),
       cardNotes: $("#cardNotes"),
       createTagPicker: $("#createTagPicker"),
       newTagsInput: $("#newTagsInput"),
@@ -283,6 +285,49 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+    }
+
+    function normalizeSideSuggestionText(value) {
+      return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLocaleLowerCase("uk");
+    }
+
+    function getSideSuggestionMatches(side, value) {
+      const query = normalizeSideSuggestionText(value);
+      if (!query) return [];
+
+      return state.cards.filter((card) => {
+        const sideText = side === "front" ? card.front : card.back;
+        return normalizeSideSuggestionText(sideText).startsWith(query);
+      });
+    }
+
+    function renderSideSuggestionList(container, matches) {
+      if (!container) return;
+
+      if (!matches.length) {
+        container.hidden = true;
+        container.innerHTML = "";
+        return;
+      }
+
+      container.hidden = false;
+      container.innerHTML = matches.map((card) => `
+        <div class="side-suggestion">${escapeHtml(card.front)} &mdash; ${escapeHtml(card.back)}</div>
+      `).join("");
+    }
+
+    function renderCreateSideSuggestions() {
+      renderSideSuggestionList(
+        els.cardFrontSuggestions,
+        getSideSuggestionMatches("front", els.cardFront.value)
+      );
+      renderSideSuggestionList(
+        els.cardBackSuggestions,
+        getSideSuggestionMatches("back", els.cardBack.value)
+      );
     }
 
     function multiline(value) {
@@ -553,6 +598,7 @@ function getSelectedStudySessionMode() {
       renderTagPickers();
       renderTagList();
       renderCardList();
+      renderCreateSideSuggestions();
       renderStudy();
       updateStudyButton();
     }
@@ -1632,10 +1678,19 @@ function renderStudy() {
       input.value = `${input.value.slice(0, start)}${char}${input.value.slice(end)}`;
       input.focus();
       input.setSelectionRange(start + char.length, start + char.length);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
     function bindEvents() {
       els.createCardForm.addEventListener("submit", createCard);
+      els.createCardForm.addEventListener("reset", () => {
+        window.setTimeout(renderCreateSideSuggestions, 0);
+      });
+
+      [els.cardFront, els.cardBack].forEach((input) => {
+        input.addEventListener("input", renderCreateSideSuggestions);
+        input.addEventListener("change", renderCreateSideSuggestions);
+      });
 
       els.quickAddTag.addEventListener("click", addQuickTag);
       els.quickTagName.addEventListener("keydown", (event) => {
@@ -1825,6 +1880,9 @@ function renderStudy() {
           study.answer = event.target.value;
         }
       });
+
+      window.requestAnimationFrame(renderCreateSideSuggestions);
+      window.setTimeout(renderCreateSideSuggestions, 250);
     }
 
     async function initApp() {

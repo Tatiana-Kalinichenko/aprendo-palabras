@@ -119,6 +119,30 @@ input[type="text"]:focus {
   box-shadow: 0 0 0 4px rgba(213, 95, 63, 0.12);
 }
 
+.side-suggestions {
+  margin: -4px 0 4px;
+  max-height: 148px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(99, 61, 35, 0.12);
+}
+
+.side-suggestion {
+  padding: 8px 10px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-suggestion + .side-suggestion {
+  border-top: 1px solid var(--soft);
+}
+
 .close-button {
   width: 44px;
   height: 44px;

@@ -343,6 +343,30 @@
       accent-color: var(--accent);
     }
 
+    .side-suggestions {
+      margin: 6px 0 12px;
+      max-height: 172px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 12px 28px rgba(99, 61, 35, 0.1);
+    }
+
+    .side-suggestion {
+      padding: 9px 12px;
+      color: var(--ink);
+      font-size: 0.9rem;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .side-suggestion + .side-suggestion {
+      border-top: 1px solid var(--soft-2);
+    }
+
     .form-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
