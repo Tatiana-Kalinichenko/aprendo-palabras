@@ -2,7 +2,7 @@
   --ink: #121429;
   --ink-soft: #505a78;
   --orange: #ff5f0a;
-  --orange-dark: #ed4f00;
+  --orange-dark: #b83b00;
   --orange-soft: #fff2e9;
   --cream: #fffaf5;
   --paper: #ffffff;
@@ -79,9 +79,9 @@ img {
 }
 
 .brand__icon {
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   box-shadow: 0 8px 20px rgba(255, 95, 10, 0.18);
 }
 
