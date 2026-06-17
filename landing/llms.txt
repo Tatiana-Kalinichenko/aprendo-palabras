@@ -1,0 +1,6 @@
+# Aprendo Palabras
+
+Static landing page for the Aprendo Palabras Chrome extension.
+
+- [Website](https://aprendopalabras.com/)
+- [Chrome Web Store](https://chromewebstore.google.com/detail/aprendo-espa%C3%B1ol-cards/gnejekdpadcfeadedlinhjobbhigabhm)
