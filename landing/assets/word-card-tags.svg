@@ -1,7 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="240" height="144" viewBox="0 0 240 144" fill="none">
   <rect x="1" y="1" width="238" height="142" rx="23" fill="white" stroke="#ecded5" stroke-width="2"/>
-  <text x="26" y="38" fill="#59617d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="15" font-weight="600">Тег</text>
-  <text x="26" y="69" fill="#121429" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="23" font-weight="760">#Погода</text>
-  <text x="26" y="99" fill="#121429" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="23" font-weight="760">#Дієслово</text>
-  <text x="26" y="129" fill="#121429" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="23" font-weight="760">#Подорож</text>
+  <text x="26" y="38" fill="#59617d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="15" font-weight="600">English</text>
+  <text x="26" y="80" fill="#121429" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="32" font-weight="900">To learn</text>
+  <text x="26" y="115" fill="#59617d" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif" font-size="18" font-weight="700">#verb</text>
 </svg>
