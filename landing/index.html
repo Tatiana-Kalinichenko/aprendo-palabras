@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Aprendo palabras - Chrome extension</title>
+    <title>Aprendo palabras - розширення Chrome</title>
     <meta
       name="description"
       content="Aprendo palabras допомагає створювати власні словникові картки, повторювати слова й закріплювати їх у пам'яті."
@@ -19,13 +19,19 @@
           <span>Aprendo palabras</span>
         </a>
 
-        <nav class="main-nav" aria-label="Основна навігація">
-          <a href="#benefits">Переваги</a>
-          <a href="#features">Можливості</a>
-          <a href="#how-it-works">Як працює</a>
+        <nav class="main-nav" aria-label="Основна навігація" data-i18n-aria-label="nav.aria">
+          <a href="#benefits" data-i18n="nav.benefits">Переваги</a>
+          <a href="#features" data-i18n="nav.features">Можливості</a>
+          <a href="#how-it-works" data-i18n="nav.howItWorks">Як працює</a>
         </nav>
 
-        <a class="header-button" href="https://chromewebstore.google.com/detail/aprendo-espa%C3%B1ol-cards/gnejekdpadcfeadedlinhjobbhigabhm">Встановити</a>
+        <div class="language-switch" role="group" aria-label="Мова інтерфейсу" data-i18n-aria-label="language.aria">
+          <button class="language-switch__button is-active" type="button" data-lang="uk" data-i18n="language.uk" aria-pressed="true">Укр</button>
+          <span class="language-switch__separator" aria-hidden="true">|</span>
+          <button class="language-switch__button" type="button" data-lang="en" data-i18n="language.en" aria-pressed="false">Eng</button>
+        </div>
+
+        <a class="header-button" href="https://chromewebstore.google.com/detail/aprendo-espa%C3%B1ol-cards/gnejekdpadcfeadedlinhjobbhigabhm" data-i18n="nav.install">Встановити</a>
       </header>
 
       <main>
@@ -33,16 +39,16 @@
           <div class="hero__content">
             <p class="pill">
               <span class="pill__dot" aria-hidden="true"></span>
-              Chrome extension для власного словника
+              <span data-i18n="hero.badge">Chrome extension для власного словника</span>
             </p>
 
             <h1 id="hero-title">
-              <span>Вивчай іноземні</span>
-              <span>слова прямо</span>
-              <span>у браузері</span>
+              <span data-i18n="hero.title.1">Вивчай іноземні</span>
+              <span data-i18n="hero.title.2">слова прямо</span>
+              <span data-i18n="hero.title.3">у браузері</span>
             </h1>
 
-            <p class="hero__lead">
+            <p class="hero__lead" data-i18n="hero.lead">
               Aprendo palabras допомагає створювати власні словникові картки,
               повторювати слова й поступово закріплювати їх у пам'яті.
             </p>
@@ -50,13 +56,13 @@
             <div class="hero__actions">
               <a class="button button--primary" href="https://chromewebstore.google.com/detail/aprendo-espa%C3%B1ol-cards/gnejekdpadcfeadedlinhjobbhigabhm">
                 <span class="chrome-mark" aria-hidden="true"></span>
-                Встановити з Chrome Web Store
+                <span data-i18n="hero.primaryCta">Встановити з Chrome Web Store</span>
               </a>
-              <a class="button button--secondary" href="#how-it-works">Як це працює</a>
+              <a class="button button--secondary" href="#how-it-works" data-i18n="hero.secondaryCta">Як це працює</a>
             </div>
           </div>
 
-          <div class="hero-preview" aria-label="Попередній вигляд Aprendo palabras">
+          <div class="hero-preview" aria-label="Попередній вигляд Aprendo palabras" data-i18n-aria-label="hero.previewAria">
             <div class="window-dots" aria-hidden="true">
               <span></span>
               <span></span>
@@ -70,9 +76,9 @@
                   <strong>Aprendo palabras</strong>
                 </div>
 
-                <div class="mode-switch" aria-label="Режими">
-                  <span class="mode-switch__active">Вивчення</span>
-                  <span>Повтор</span>
+                <div class="mode-switch" aria-label="Режими" data-i18n-aria-label="hero.modesAria">
+                  <span class="mode-switch__active" data-i18n="hero.learningMode">Вивчення</span>
+                  <span data-i18n="hero.reviewMode">Повтор</span>
                 </div>
               </div>
 
@@ -92,9 +98,9 @@
         </section>
 
         <section class="section section--benefits" id="benefits" aria-labelledby="benefits-title">
-          <p class="section-kicker">Переваги</p>
-          <h2 id="benefits-title">Наші переваги</h2>
-          <p class="section-lead">
+          <p class="section-kicker" data-i18n="benefits.kicker">Переваги</p>
+          <h2 id="benefits-title" data-i18n="benefits.title">Наші переваги</h2>
+          <p class="section-lead" data-i18n="benefits.lead">
             Усе продумано так, щоб додавати й повторювати слова було легко з
             першого дня.
           </p>
@@ -102,8 +108,8 @@
           <div class="benefits-grid">
             <article class="benefit-card">
               <img class="benefit-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
-              <h3>Простий інтерфейс</h3>
-              <p>
+              <h3 data-i18n="benefits.simpleTitle">Простий інтерфейс</h3>
+              <p data-i18n="benefits.simpleText">
                 Усі основні функції під рукою: додавання карток, режими вивчення
                 та повторення без складних налаштувань.
               </p>
@@ -111,8 +117,8 @@
 
             <article class="benefit-card benefit-card--context">
               <img class="benefit-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
-              <h3>Додавання слів із сайтів</h3>
-              <p>
+              <h3 data-i18n="benefits.contextTitle">Додавання слів із сайтів</h3>
+              <p data-i18n="benefits.contextText">
                 Виділіть слово або фразу на сторінці, відкрийте контекстне меню й
                 одразу створіть нову картку.
               </p>
@@ -124,17 +130,17 @@
                   <span>Guarda las frases útiles en tu lista.</span>
                 </div>
                 <div class="context-menu">
-                  <span>Копіювати</span>
-                  <strong>Створити картку — Aprendo Palabras</strong>
-                  <span>Пошук у Google</span>
+                  <span data-i18n="benefits.copy">Копіювати</span>
+                  <strong data-i18n="benefits.createCard">Створити картку — Aprendo Palabras</strong>
+                  <span data-i18n="benefits.googleSearch">Пошук у Google</span>
                 </div>
               </div>
             </article>
 
             <article class="benefit-card">
               <img class="benefit-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
-              <h3>Без зайвого клопоту</h3>
-              <p>
+              <h3 data-i18n="benefits.easyTitle">Без зайвого клопоту</h3>
+              <p data-i18n="benefits.easyText">
                 Без логінів, без реклами, без складного старту — просто
                 встановіть розширення і починайте користуватися.
               </p>
@@ -143,70 +149,70 @@
         </section>
 
         <section class="section section--features" id="features" aria-labelledby="features-title">
-          <p class="section-kicker">Можливості</p>
-          <h2 id="features-title">Усе потрібне для простих словникових карток</h2>
+          <p class="section-kicker" data-i18n="features.kicker">Можливості</p>
+          <h2 id="features-title" data-i18n="features.title">Усе потрібне для простих словникових карток</h2>
 
           <div class="features-grid">
             <article class="feature-tile">
               <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
               <div>
-                <h3>Створення власних карток</h3>
-                <p>Вводиш слово, переклад, тег і додаткові позначки.</p>
+                <h3 data-i18n="features.item.1.title">Створення власних карток</h3>
+                <p data-i18n="features.item.1.text">Вводиш слово, переклад, тег і додаткові позначки.</p>
               </div>
             </article>
 
             <article class="feature-tile">
               <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
               <div>
-                <h3>Режими вивчення</h3>
-                <p>Обирай етапи для нових, знайомих і вже вивчених слів.</p>
+                <h3 data-i18n="features.item.2.title">Режими вивчення</h3>
+                <p data-i18n="features.item.2.text">Обирай етапи для нових, знайомих і вже вивчених слів.</p>
               </div>
             </article>
 
             <article class="feature-tile">
               <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
               <div>
-                <h3>Повтор уже знайомих слів</h3>
-                <p>Повертаєшся до уроків, які не хочеться втратити з пам'яті.</p>
+                <h3 data-i18n="features.item.3.title">Повтор уже знайомих слів</h3>
+                <p data-i18n="features.item.3.text">Повертаєшся до уроків, які не хочеться втратити з пам'яті.</p>
               </div>
             </article>
 
             <article class="feature-tile">
               <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
               <div>
-                <h3>Імпорт CSV</h3>
-                <p>Можна завантажити готовий список слів у потрібному форматі.</p>
+                <h3 data-i18n="features.item.4.title">Імпорт CSV</h3>
+                <p data-i18n="features.item.4.text">Можна завантажити готовий список слів у потрібному форматі.</p>
               </div>
             </article>
 
             <article class="feature-tile">
               <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
               <div>
-                <h3>Робота у Chrome</h3>
-                <p>Додаток відкривається прямо в браузері, без окремої програми.</p>
+                <h3 data-i18n="features.item.5.title">Робота у Chrome</h3>
+                <p data-i18n="features.item.5.text">Додаток відкривається прямо в браузері, без окремої програми.</p>
               </div>
             </article>
 
             <article class="feature-tile">
               <img class="check-icon" src="assets/icon-check.svg" alt="" aria-hidden="true">
               <div>
-                <h3>Український інтерфейс</h3>
-                <p>Меню, режими й підказки написані українською.</p>
+                <h3 data-i18n="features.item.6.title">Двомовний інтерфейс</h3>
+                <p data-i18n="features.item.6.text">Перемикайся між українською та англійською мовами інтерфейсу.</p>
               </div>
             </article>
           </div>
         </section>
 
         <section class="section section--steps" id="how-it-works" aria-labelledby="steps-title">
-          <p class="section-kicker">Як працює</p>
-          <h2 id="steps-title">Три кроки — і словник уже з тобою</h2>
+          <p class="section-kicker" data-i18n="steps.kicker">Як працює</p>
+          <h2 id="steps-title" data-i18n="steps.title">Три кроки — і словник уже з тобою</h2>
 
           <div class="steps-grid">
             <article class="step-card">
               <img class="step-icon" src="assets/icon-add-card.svg" alt="" aria-hidden="true">
               <div>
-                <h3>Додай картки</h3>
-                <p>Наповни словник іноземними словами з перекладом, примітками та тегом.</p>
+                <h3 data-i18n="steps.item.1.title">Додай картки</h3>
+                <p data-i18n="steps.item.1.text">Наповни словник іноземними словами з перекладом, примітками та тегом.</p>
               </div>
               <span class="step-number">1</span>
             </article>
@@ -214,8 +220,8 @@
             <article class="step-card">
               <img class="step-icon" src="assets/icon-repeat.svg" alt="" aria-hidden="true">
               <div>
-                <h3>Обирай слова для вивчення</h3>
-                <p>Перенеси обрані слова в режим Вивчення і повторюй їх для запам’ятовування.</p>
+                <h3 data-i18n="steps.item.2.title">Обирай слова для вивчення</h3>
+                <p data-i18n="steps.item.2.text">Перенеси обрані слова в режим Вивчення і повторюй їх для запам’ятовування.</p>
               </div>
               <span class="step-number">2</span>
             </article>
@@ -223,8 +229,8 @@
             <article class="step-card">
               <img class="step-icon" src="assets/icon-done.svg" alt="" aria-hidden="true">
               <div>
-                <h3>Збирай словник</h3>
-                <p>Переміщуй вивчені слова в категорію "Знаю", створюючи свій особистий лексикон.</p>
+                <h3 data-i18n="steps.item.3.title">Збирай словник</h3>
+                <p data-i18n="steps.item.3.text">Переміщуй вивчені слова в категорію "Знаю", створюючи свій особистий лексикон.</p>
               </div>
               <span class="step-number">3</span>
             </article>
@@ -232,8 +238,8 @@
 
           <div class="bottom-cta">
             <div>
-              <h2>Спробуй Aprendo palabras у своєму браузері</h2>
-              <p>
+              <h2 data-i18n="cta.title">Спробуй Aprendo palabras у своєму браузері</h2>
+              <p data-i18n="cta.text">
                 Додай розширення в Chrome і почни збирати власний словник уже
                 сьогодні.
               </p>
@@ -241,16 +247,20 @@
 
             <a class="button button--primary" href="https://chromewebstore.google.com/detail/aprendo-espa%C3%B1ol-cards/gnejekdpadcfeadedlinhjobbhigabhm">
               <span class="chrome-mark" aria-hidden="true"></span>
-              Встановити з Chrome Web Store
+              <span data-i18n="cta.button">Встановити з Chrome Web Store</span>
             </a>
           </div>
         </section>
       </main>
 
       <footer class="site-footer">
-        <span>Landing design mockup • HTML • PNG preview</span>
+        <span data-i18n="footer.meta">Макет лендінгу • HTML • PNG-прев'ю</span>
         <span>Aprendo palabras</span>
       </footer>
     </div>
+    <button class="back-to-top" type="button" aria-label="Повернутися нагору" data-i18n-aria-label="backToTop.aria">
+      <span aria-hidden="true">↑</span>
+    </button>
+    <script src="i18n.js"></script>
   </body>
 </html>
