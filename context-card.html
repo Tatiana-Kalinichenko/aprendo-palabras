@@ -1,10 +1,11 @@
 <!doctype html>
-<html lang="uk">
+<html lang="uk" data-i18n-title="meta.contextTitle">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Нова картка — Aprendo Palabras</title>
   <link rel="stylesheet" href="context-card.css" />
+  <script src="extension-i18n.js" defer></script>
   <script src="context-card.js" defer></script>
 </head>
 <body>
@@ -13,26 +14,27 @@
       <header class="popup-head">
         <div class="title-group">
           <img class="app-icon" src="icons/icon48.png" alt="" />
-          <h1>Нова картка</h1>
+          <h1 data-i18n="context.title">Нова картка</h1>
         </div>
-        <button class="close-button" id="closeBtn" type="button" aria-label="Закрити">×</button>
       </header>
 
-      <label for="cardFront">Сторона 1</label>
+      <label for="cardFront" data-i18n="context.frontLabel">Сторона 1</label>
       <textarea id="cardFront" rows="2" autocomplete="off"></textarea>
+      <div class="side-suggestions" id="cardFrontSuggestions" hidden></div>
 
       <div class="swap-row">
         <button class="swap-button" id="swapSides" type="button">
-          <span aria-hidden="true">⇅</span>
-          Поміняти сторони
+          <span class="ui-icon ui-icon-swap-vertical" aria-hidden="true"></span>
+          <span data-i18n="context.swapSides">Поміняти сторони</span>
         </button>
       </div>
 
-      <label for="cardBack">Сторона 2</label>
+      <label for="cardBack" data-i18n="context.backLabel">Сторона 2</label>
       <textarea id="cardBack" rows="2" autocomplete="off"></textarea>
+      <div class="side-suggestions" id="cardBackSuggestions" hidden></div>
 
       <section class="field-block" aria-labelledby="accentTitle">
-        <h2 id="accentTitle">Швидкі символи</h2>
+        <h2 id="accentTitle" data-i18n="context.accentTitle">Швидкі символи</h2>
         <div class="accent-row">
           <button type="button" data-char="á">á</button>
           <button type="button" data-char="é">é</button>
@@ -46,14 +48,14 @@
       </section>
 
       <section class="field-block" aria-labelledby="tagsTitle">
-        <h2 id="tagsTitle">Теги</h2>
+        <h2 id="tagsTitle" data-i18n="context.tagsTitle">Теги</h2>
         <div class="tag-combobox">
           <button class="tag-trigger" id="tagDropdownButton" type="button" aria-haspopup="listbox" aria-expanded="false">
-            <span id="tagDropdownLabel">Оберіть або створіть теги</span>
-            <span class="chevron" aria-hidden="true">⌄</span>
+            <span id="tagDropdownLabel" data-i18n="context.tagPlaceholder">Оберіть або створіть теги</span>
+            <span class="ui-icon ui-icon-dropdown chevron" aria-hidden="true"></span>
           </button>
           <div class="tag-dropdown" id="tagDropdown" hidden>
-            <input id="tagSearch" type="text" placeholder="Пошук або новий тег" autocomplete="off" />
+            <input id="tagSearch" type="text" placeholder="Пошук або новий тег" autocomplete="off" data-i18n-placeholder="context.tagSearchPlaceholder" />
             <div class="tag-options" id="tagOptions" role="listbox" aria-multiselectable="true"></div>
             <button class="create-tag" id="createTagButton" type="button" hidden></button>
           </div>
@@ -61,13 +63,13 @@
         <div class="selected-tags" id="selectedTags"></div>
       </section>
 
-      <label for="cardNotes">Примітка</label>
-      <textarea id="cardNotes" rows="3" placeholder="Наприклад, синонім або форма слова"></textarea>
+      <label for="cardNotes" data-i18n="context.notesLabel">Примітка</label>
+      <textarea id="cardNotes" rows="3" placeholder="Наприклад, синонім або форма слова" data-i18n-placeholder="context.notesPlaceholder"></textarea>
 
       <p class="length-warning" id="lengthWarning" hidden></p>
       <p class="form-message" id="formMessage" role="status" aria-live="polite"></p>
 
-      <button class="create-button" id="createCardBtn" type="submit">Створити картку</button>
+      <button class="create-button" id="createCardBtn" type="submit" data-i18n="context.submit">Створити картку</button>
     </form>
   </main>
 </body>

@@ -9,11 +9,17 @@ let lastFocusedSide = null;
 
 const $ = (selector) => document.querySelector(selector);
 
+const t = (key, params = {}) => (
+  window.AprendoI18n ? window.AprendoI18n.t(key, params) : key
+);
+
 const els = {
   form: $("#cardForm"),
   closeBtn: $("#closeBtn"),
   front: $("#cardFront"),
   back: $("#cardBack"),
+  frontSuggestions: $("#cardFrontSuggestions"),
+  backSuggestions: $("#cardBackSuggestions"),
   notes: $("#cardNotes"),
   swapSides: $("#swapSides"),
   tagDropdownButton: $("#tagDropdownButton"),
@@ -160,6 +166,49 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function normalizeSideSuggestionText(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("uk");
+}
+
+function getSideSuggestionMatches(side, value) {
+  const query = normalizeSideSuggestionText(value);
+  if (!query) return [];
+
+  return state.cards.filter((card) => {
+    const sideText = side === "front" ? card.front : card.back;
+    return normalizeSideSuggestionText(sideText).startsWith(query);
+  });
+}
+
+function renderSideSuggestionList(container, matches) {
+  if (!container) return;
+
+  if (!matches.length) {
+    container.hidden = true;
+    container.innerHTML = "";
+    return;
+  }
+
+  container.hidden = false;
+  container.innerHTML = matches.map((card) => `
+    <div class="side-suggestion">${escapeHtml(card.front)} &mdash; ${escapeHtml(card.back)}</div>
+  `).join("");
+}
+
+function renderCreateSideSuggestions() {
+  renderSideSuggestionList(
+    els.frontSuggestions,
+    getSideSuggestionMatches("front", els.front.value)
+  );
+  renderSideSuggestionList(
+    els.backSuggestions,
+    getSideSuggestionMatches("back", els.back.value)
+  );
+}
+
 function sortTags() {
   state.tags.sort((a, b) => a.name.localeCompare(b.name, "uk", { sensitivity: "base" }));
 }
@@ -219,6 +268,7 @@ function setInitialSelectionText(text) {
   }
 
   updateLengthWarning();
+  renderCreateSideSuggestions();
 }
 
 async function readPendingSelectionText() {
@@ -249,7 +299,7 @@ function updateLengthWarning() {
   }
 
   els.lengthWarning.hidden = false;
-  els.lengthWarning.textContent = "Текст довгий. За потреби скоротіть сторону картки перед створенням.";
+  els.lengthWarning.textContent = t("context.longText");
 }
 
 function closeTagDropdown() {
@@ -273,15 +323,15 @@ function renderSelectedTags() {
   const tags = getSelectedTags();
 
   els.selectedTags.innerHTML = tags.map((tag) => `
-    <span class="selected-tag">
-      <span>${escapeHtml(tag.name)}</span>
-      <button type="button" data-remove-tag="${escapeHtml(tag.id)}" aria-label="Прибрати тег ${escapeHtml(tag.name)}">×</button>
+      <span class="selected-tag">
+        <span>${escapeHtml(tag.name)}</span>
+      <button type="button" data-remove-tag="${escapeHtml(tag.id)}" aria-label="${escapeHtml(t("context.removeTag", { name: tag.name }))}">×</button>
     </span>
   `).join("");
 
   els.tagDropdownLabel.innerHTML = tags.length
-    ? `<strong>${tags.length}</strong> обрано`
-    : "Оберіть або створіть теги";
+    ? `<strong>${tags.length}</strong> ${escapeHtml(t("context.selectedTags", { count: tags.length })).replace(String(tags.length), "").trim()}`
+    : t("context.tagPlaceholder");
 }
 
 function renderTagDropdown() {
@@ -291,7 +341,7 @@ function renderTagDropdown() {
     .sort((a, b) => a.name.localeCompare(b.name, "uk", { sensitivity: "base" }));
 
   if (!filteredTags.length) {
-    els.tagOptions.innerHTML = `<div class="empty-tags">Тегів не знайдено.</div>`;
+    els.tagOptions.innerHTML = `<div class="empty-tags">${escapeHtml(t("context.emptyTags"))}</div>`;
   } else {
     els.tagOptions.innerHTML = filteredTags.map((tag) => {
       const selected = selectedTagIds.has(tag.id);
@@ -307,7 +357,7 @@ function renderTagDropdown() {
   const rawName = els.tagSearch.value.trim();
   const canCreate = rawName && !state.tags.some((tag) => normalize(tag.name) === normalize(rawName));
   els.createTagButton.hidden = !canCreate;
-  els.createTagButton.textContent = canCreate ? `Створити тег “${rawName}”` : "";
+  els.createTagButton.textContent = canCreate ? t("context.createTag", { name: rawName }) : "";
 }
 
 function toggleTag(tagId) {
@@ -329,9 +379,9 @@ function createTagFromSearch() {
 }
 
 function getValidationMessage(front, back) {
-  if (!front && !back) return "Заповніть обидві сторони картки.";
-  if (!front) return "Заповніть Сторону 1.";
-  if (!back) return "Заповніть Сторону 2.";
+  if (!front && !back) return t("context.validationBoth");
+  if (!front) return t("context.validationFront");
+  if (!back) return t("context.validationBack");
   return "";
 }
 
@@ -372,12 +422,12 @@ async function createCard(event) {
     sortTags();
     els.createCardBtn.disabled = true;
     await saveState();
-    setMessage("Картку створено", "success");
+    setMessage(t("context.created"), "success");
     window.setTimeout(() => window.close(), 900);
   } catch (error) {
     console.warn("Could not save context card", error);
     els.createCardBtn.disabled = false;
-    setMessage("Не вдалося зберегти картку. Спробуйте ще раз.", "error");
+    setMessage(t("context.saveFailed"), "error");
   }
 }
 
@@ -386,6 +436,7 @@ function swapSides() {
   els.front.value = els.back.value;
   els.back.value = front;
   updateLengthWarning();
+  renderCreateSideSuggestions();
 }
 
 function insertAtCursor(input, char) {
@@ -395,10 +446,13 @@ function insertAtCursor(input, char) {
   input.focus();
   input.setSelectionRange(start + char.length, start + char.length);
   updateLengthWarning();
+  input.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 function bindEvents() {
-  els.closeBtn.addEventListener("click", () => window.close());
+  if (els.closeBtn) {
+    els.closeBtn.addEventListener("click", () => window.close());
+  }
   els.form.addEventListener("submit", createCard);
   els.swapSides.addEventListener("click", swapSides);
 
@@ -408,8 +462,10 @@ function bindEvents() {
     });
     input.addEventListener("input", () => {
       updateLengthWarning();
+      renderCreateSideSuggestions();
       setMessage("");
     });
+    input.addEventListener("change", renderCreateSideSuggestions);
   });
 
   els.notes.addEventListener("input", () => setMessage(""));
@@ -451,15 +507,26 @@ function bindEvents() {
 }
 
 async function init() {
+  if (window.AprendoI18n) {
+    await window.AprendoI18n.init({
+      onChange: () => {
+        renderSelectedTags();
+        renderTagDropdown();
+        updateLengthWarning();
+      }
+    });
+  }
   await loadState();
   sortTags();
   renderSelectedTags();
   renderTagDropdown();
   bindEvents();
   setInitialSelectionText(await readPendingSelectionText());
+  window.requestAnimationFrame(renderCreateSideSuggestions);
+  window.setTimeout(renderCreateSideSuggestions, 250);
 }
 
 init().catch((error) => {
   console.warn("Could not initialize context card popup", error);
-  setMessage("Не вдалося завантажити дані. Спробуйте ще раз.", "error");
+  setMessage(t("context.loadFailed"), "error");
 });

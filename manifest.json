@@ -1,16 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Aprendo Español Cards",
-  "short_name": "Aprendo Español",
-  "version": "1.2.0",
-  "description": "Локальний додаток для створення і вивчення іноземних слів з тегами, CSV-імпортом та експортом.",
+  "default_locale": "uk",
+  "name": "Aprendo Palabras",
+  "short_name": "Aprendo Palabras",
+  "version": "1.4.0",
+  "description": "__MSG_extensionDescription__",
   "permissions": [
     "storage",
     "contextMenus"
   ],
   "options_page": "app.html",
   "action": {
-    "default_title": "Відкрити Aprendo Español",
+    "default_title": "__MSG_actionDefaultTitle__",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",

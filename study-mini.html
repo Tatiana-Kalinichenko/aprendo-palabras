@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="uk" data-i18n-title="meta.studyMiniTitle">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ed3c11" />
+  <title>Міні-вікно навчання — Aprendo Palabras</title>
+  <link rel="stylesheet" href="study-mini.css" />
+  <script src="extension-i18n.js" defer></script>
+  <script src="study-mini.js" defer></script>
+</head>
+<body>
+  <main class="study-mini">
+    <header class="mini-titlebar">
+      <strong>Aprendo Palabras</strong>
+      <div class="mini-window-actions">
+        <button class="ghost close-button" id="openAppButton" type="button" data-i18n="mini.openTab">У вкладку</button>
+        <button class="ghost close-button" id="closeButton" type="button" data-i18n="mini.close">Закрити</button>
+      </div>
+    </header>
+
+    <section class="mini-card" id="miniCard" aria-live="polite"></section>
+
+    <section class="mini-controls" id="miniControls"></section>
+  </main>
+</body>
+</html>
