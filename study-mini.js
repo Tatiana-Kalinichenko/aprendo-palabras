@@ -42,6 +42,7 @@
   let state = { cards: [], tags: [] };
   let study = null;
   let history = [];
+  let studyDeck = createEmptyStudyDeck(sessionMode);
   let syncingStudyState = false;
   let lastStudySyncUpdatedAt = 0;
 
@@ -75,17 +76,20 @@
     try {
       const parsed = typeof value === "string" ? JSON.parse(value) : value;
       if (!parsed || typeof parsed !== "object") return null;
+      const normalizedSessionMode = STUDY_SESSION_CARD_MODES[parsed.sessionMode] ? parsed.sessionMode : "learning";
 
       return {
         active: Boolean(parsed.active),
         source: String(parsed.source || ""),
         updatedAt: Number(parsed.updatedAt) || 0,
-        sessionMode: STUDY_SESSION_CARD_MODES[parsed.sessionMode] ? parsed.sessionMode : "learning",
+        sessionMode: normalizedSessionMode,
         sideMode: ["front", "back", "random"].includes(parsed.sideMode) ? parsed.sideMode : "random",
         cardId: String(parsed.cardId || ""),
         side: ["front", "back"].includes(parsed.side) ? parsed.side : "front",
         flipped: Boolean(parsed.flipped),
-        answer: String(parsed.answer || "")
+        answer: String(parsed.answer || ""),
+        history: normalizeIdList(parsed.history),
+        deck: normalizeStudyDeckSnapshot(parsed.deck, normalizedSessionMode)
       };
     } catch (error) {
       return null;
@@ -155,12 +159,106 @@
     return Math.random() < 0.5 ? "front" : "back";
   }
 
+  function createEmptyStudyDeck(deckSessionMode = null) {
+    return {
+      sessionMode: deckSessionMode,
+      queueIds: [],
+      lastCycleIds: []
+    };
+  }
+
+  function resetStudyDeck(deckSessionMode = null) {
+    studyDeck = createEmptyStudyDeck(deckSessionMode);
+  }
+
+  function normalizeIdList(value) {
+    return Array.isArray(value)
+      ? value.map((id) => String(id || "")).filter(Boolean)
+      : [];
+  }
+
+  function uniqueIds(ids) {
+    return Array.from(new Set(ids));
+  }
+
+  function normalizeStudyDeckSnapshot(value, fallbackSessionMode = null) {
+    const deck = value && typeof value === "object" ? value : {};
+    const deckSessionMode = STUDY_SESSION_CARD_MODES[deck.sessionMode] ? deck.sessionMode : null;
+    const normalizedSessionMode = deckSessionMode === fallbackSessionMode
+      ? deckSessionMode
+      : fallbackSessionMode || deckSessionMode;
+
+    return {
+      sessionMode: normalizedSessionMode,
+      queueIds: uniqueIds(normalizeIdList(deck.queueIds)),
+      lastCycleIds: uniqueIds(normalizeIdList(deck.lastCycleIds))
+    };
+  }
+
+  function shuffleIds(ids) {
+    const shuffled = ids.slice();
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const randomIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+    }
+
+    return shuffled;
+  }
+
+  function isSameOrder(first, second) {
+    return first.length === second.length && first.every((id, index) => id === second[index]);
+  }
+
+  function rotateFirstIdToEnd(ids) {
+    return ids.length > 1 ? ids.slice(1).concat(ids[0]) : ids;
+  }
+
+  function avoidSameCycleOrder(ids, previousIds) {
+    if (ids.length <= 1 || !isSameOrder(ids, previousIds)) return ids;
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const shuffled = shuffleIds(ids);
+      if (!isSameOrder(shuffled, previousIds)) return shuffled;
+    }
+
+    return rotateFirstIdToEnd(ids);
+  }
+
+  function avoidImmediateRepeat(ids, previousId, previousCycleIds = []) {
+    if (ids.length <= 1 || !previousId || ids[0] !== previousId) return ids;
+
+    const rotated = rotateFirstIdToEnd(ids);
+    return isSameOrder(rotated, previousCycleIds) ? ids : rotated;
+  }
+
+  function buildStudyCycle(ids, previousCycleIds, previousId) {
+    const shuffled = avoidSameCycleOrder(shuffleIds(ids), previousCycleIds);
+    return avoidImmediateRepeat(shuffled, previousId, previousCycleIds);
+  }
+
+  function primeStudyDeckAfterCurrent(currentId, deckSessionMode) {
+    const poolIds = getPool(deckSessionMode).map((card) => card.id);
+
+    if (!poolIds.includes(currentId)) {
+      resetStudyDeck(deckSessionMode);
+      return;
+    }
+
+    const remainingIds = shuffleIds(poolIds.filter((id) => id !== currentId));
+    studyDeck = {
+      sessionMode: deckSessionMode,
+      queueIds: remainingIds,
+      lastCycleIds: [currentId].concat(remainingIds)
+    };
+  }
+
   function getCurrentCard() {
     return study ? state.cards.find((card) => card.id === study.cardId) || null : null;
   }
 
-  function getPool() {
-    const cardMode = getStudyCardMode();
+  function getPool(currentSessionMode = sessionMode) {
+    const cardMode = getStudyCardMode(currentSessionMode);
     return state.cards.filter((card) => card.mode === cardMode);
   }
 
@@ -174,7 +272,9 @@
       cardId: study?.cardId || "",
       side: study?.side || "front",
       flipped: Boolean(study?.flipped),
-      answer: study?.answer || ""
+      answer: study?.answer || "",
+      history: history.slice(),
+      deck: normalizeStudyDeckSnapshot(studyDeck, sessionMode)
     };
   }
 
@@ -199,6 +299,7 @@
     if (!snapshot.active) {
       study = null;
       history = [];
+      resetStudyDeck(snapshot.sessionMode);
       render();
       syncingStudyState = false;
       return true;
@@ -208,6 +309,7 @@
     if (!card) {
       study = null;
       history = [];
+      resetStudyDeck(snapshot.sessionMode);
       render();
       syncingStudyState = false;
       return true;
@@ -220,6 +322,11 @@
       flipped: snapshot.flipped,
       answer: snapshot.answer
     };
+    history = snapshot.history.slice();
+    studyDeck = snapshot.deck;
+    if (!studyDeck.queueIds.length && !studyDeck.lastCycleIds.length) {
+      primeStudyDeckAfterCurrent(card.id, snapshot.sessionMode);
+    }
     render();
     syncingStudyState = false;
     return true;
@@ -245,14 +352,39 @@
     const pool = getPool();
     if (!pool.length) {
       study = null;
+      history = [];
+      resetStudyDeck(sessionMode);
       render();
       publishStudyState();
       return;
     }
 
-    const candidates = pool.filter((card) => card.id !== excludeId);
-    const nextPool = candidates.length ? candidates : pool;
-    const next = nextPool[Math.floor(Math.random() * nextPool.length)];
+    const poolIds = pool.map((card) => card.id);
+    const poolIdSet = new Set(poolIds);
+    const cardsById = new Map(pool.map((card) => [card.id, card]));
+
+    if (studyDeck.sessionMode !== sessionMode) {
+      resetStudyDeck(sessionMode);
+    }
+
+    studyDeck.queueIds = studyDeck.queueIds.filter((id) => poolIdSet.has(id));
+
+    if (!studyDeck.queueIds.length) {
+      const cycleIds = buildStudyCycle(poolIds, studyDeck.lastCycleIds, excludeId);
+      studyDeck.lastCycleIds = cycleIds.slice();
+      studyDeck.queueIds = cycleIds.slice();
+    } else {
+      studyDeck.queueIds = avoidImmediateRepeat(studyDeck.queueIds, excludeId);
+    }
+
+    const cardId = studyDeck.queueIds.shift();
+    const next = cardsById.get(cardId);
+
+    if (!next) {
+      pickCard(excludeId, rememberCurrent);
+      return;
+    }
+
     setStudyCard(next, rememberCurrent);
   }
 
@@ -448,7 +580,10 @@
     if (!applySharedStudyState(stored.storedStudy, { force: true })) {
       const requestedCardId = params.get("card") || "";
       const requestedCard = state.cards.find((card) => card.id === requestedCardId && card.mode === getStudyCardMode());
-      if (requestedCard) setStudyCard(requestedCard, false);
+      if (requestedCard) {
+        primeStudyDeckAfterCurrent(requestedCard.id, sessionMode);
+        setStudyCard(requestedCard, false);
+      }
       else pickCard(null, false);
     }
 

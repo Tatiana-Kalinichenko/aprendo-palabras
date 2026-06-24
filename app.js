@@ -306,17 +306,20 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       try {
         const parsed = typeof value === "string" ? JSON.parse(value) : value;
         if (!parsed || typeof parsed !== "object") return null;
+        const sessionMode = STUDY_SESSION_CARD_MODES[parsed.sessionMode] ? parsed.sessionMode : "learning";
 
         return {
           active: Boolean(parsed.active),
           source: String(parsed.source || ""),
           updatedAt: Number(parsed.updatedAt) || 0,
-          sessionMode: STUDY_SESSION_CARD_MODES[parsed.sessionMode] ? parsed.sessionMode : "learning",
+          sessionMode,
           sideMode: normalizeStudySideMode(parsed.sideMode) || "random",
           cardId: String(parsed.cardId || ""),
           side: ["front", "back"].includes(parsed.side) ? parsed.side : "front",
           flipped: Boolean(parsed.flipped),
-          answer: String(parsed.answer || "")
+          answer: String(parsed.answer || ""),
+          history: normalizeIdList(parsed.history),
+          deck: normalizeStudyDeckSnapshot(parsed.deck, sessionMode)
         };
       } catch (error) {
         return null;
@@ -334,7 +337,9 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
         cardId: study?.cardId || "",
         side: study?.side || "front",
         flipped: Boolean(study?.flipped),
-        answer: study?.answer || ""
+        answer: study?.answer || "",
+        history: studyHistory.slice(),
+        deck: normalizeStudyDeckSnapshot(studyDeck, sessionMode)
       };
     }
 
@@ -386,7 +391,11 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
         flipped: snapshot.flipped,
         answer: snapshot.answer
       };
-      resetStudyDeck(snapshot.sessionMode);
+      studyHistory = snapshot.history.slice();
+      studyDeck = snapshot.deck;
+      if (!studyDeck.queueIds.length && !studyDeck.lastCycleIds.length) {
+        primeStudyDeckAfterCurrent(card.id, snapshot.sessionMode);
+      }
       renderAll();
       syncingStudyState = false;
       return true;
@@ -601,6 +610,49 @@ function createEmptyStudyDeck(sessionMode = null) {
 
 function resetStudyDeck(sessionMode = null) {
   studyDeck = createEmptyStudyDeck(sessionMode);
+}
+
+function normalizeIdList(value) {
+  return Array.isArray(value)
+    ? value.map((id) => String(id || "")).filter(Boolean)
+    : [];
+}
+
+function uniqueIds(ids) {
+  return Array.from(new Set(ids));
+}
+
+function normalizeStudyDeckSnapshot(value, fallbackSessionMode = null) {
+  const deck = value && typeof value === "object" ? value : {};
+  const deckSessionMode = STUDY_SESSION_CARD_MODES[deck.sessionMode] ? deck.sessionMode : null;
+  const sessionMode = deckSessionMode === fallbackSessionMode
+    ? deckSessionMode
+    : fallbackSessionMode || deckSessionMode;
+
+  return {
+    sessionMode,
+    queueIds: uniqueIds(normalizeIdList(deck.queueIds)),
+    lastCycleIds: uniqueIds(normalizeIdList(deck.lastCycleIds))
+  };
+}
+
+function primeStudyDeckAfterCurrent(currentId, sessionMode) {
+  const cardMode = getStudyCardMode(sessionMode);
+  const poolIds = state.cards
+    .filter((card) => card.mode === cardMode)
+    .map((card) => card.id);
+
+  if (!poolIds.includes(currentId)) {
+    resetStudyDeck(sessionMode);
+    return;
+  }
+
+  const remainingIds = shuffleIds(poolIds.filter((id) => id !== currentId));
+  studyDeck = {
+    sessionMode,
+    queueIds: remainingIds,
+    lastCycleIds: [currentId].concat(remainingIds)
+  };
 }
 
 function getStudyCardMode(sessionMode) {
