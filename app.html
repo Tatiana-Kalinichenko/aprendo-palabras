@@ -1,49 +1,89 @@
 <!doctype html>
-<html lang="uk">
+<html lang="uk" data-i18n-title="meta.appTitle">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#d55f3f" />
+  <meta name="theme-color" content="#ed3c11" />
   <title>Aprendo Español — картки</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="extension-i18n.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
   <div class="app">
     <header class="hero">
-      <div>
-        <p class="eyebrow">Aprendo Español</p>
-        <h1>Картки для іспанської</h1>
-        <p>Створюйте власні картки українською та іспанською, додавайте теми, синоніми й відмінювання у примітках, а потім вручну керуйте режимами “Словник”, “Вивчення”, “Закріплення” і “Знаю”.</p>
+      <div class="hero-main">
+        <div class="hero-topline">
+          <div class="hero-copy">
+            <h1 data-i18n="app.hero.title">Словникові картки</h1>
+            <p data-i18n="app.hero.description">Створюйте власні картки українською та іноземною, додавайте теми, синоніми й відмінювання у примітках, а потім вручну керуйте режимами “Словник”, “Вивчення”, “Закріплення” і “Знаю”.</p>
+          </div>
+
+          <div class="hero-tools">
+            <button class="ghost hero-tool" id="importCsvBtn" type="button">
+              <span class="ui-icon ui-icon-import" aria-hidden="true"></span>
+              <span data-i18n="app.hero.importCsv">Імпорт</span>
+            </button>
+            <button class="ghost hero-tool" id="exportCsvBtn" type="button">
+              <span class="ui-icon ui-icon-export" aria-hidden="true"></span>
+              <span data-i18n="app.hero.exportCsv">Експорт</span>
+            </button>
+          </div>
+        </div>
+
         <div class="stats" id="stats"></div>
       </div>
-      <div class="hero-actions">
-        <button class="primary" id="studyBtn">Вчити</button>
 
-        <button class="ghost" id="closeStudyBtn" type="button">Закрити навчання</button>
+      <aside class="hero-study-column">
+        <div class="language-switch" role="group" aria-label="Мова інтерфейсу" data-i18n-aria-label="language.aria">
+          <button class="language-switch__button is-active" type="button" data-ui-lang="uk" data-i18n="language.uk" aria-pressed="true">Укр</button>
+          <span class="language-switch__separator" aria-hidden="true">|</span>
+          <button class="language-switch__button" type="button" data-ui-lang="en" data-i18n="language.en" aria-pressed="false">Eng</button>
+        </div>
 
-        <label class="study-mode-label" for="studySessionMode">
-          <span>Сесія</span>
-          <select id="studySessionMode">
-            <option value="learning" selected>Вивчення</option>
-            <option value="reinforcement">Закріплення</option>
-            <option value="review">Повтор</option>
-          </select>
-        </label>
+        <div class="hero-study-card">
+          <label class="study-mode-label" for="studySessionMode">
+            <span data-i18n="app.hero.session">Режим навчання</span>
+            <span class="select-shell select-shell-book" data-custom-select="studySessionMode">
+              <button class="custom-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                <span class="ui-icon" data-custom-select-icon aria-hidden="true"></span>
+                <span data-custom-select-label>Вивчення</span>
+                <span class="ui-icon ui-icon-dropdown custom-select-chevron" aria-hidden="true"></span>
+              </button>
+              <select id="studySessionMode" class="native-select-hidden" tabindex="-1" aria-hidden="true">
+                <option value="learning" selected data-i18n="session.learning">Вивчення</option>
+                <option value="reinforcement" data-i18n="session.reinforcement">Закріплення</option>
+                <option value="review" data-i18n="session.review">Повтор</option>
+              </select>
+              <div class="custom-select-menu" role="listbox" hidden></div>
+            </span>
+          </label>
 
-        <label class="study-mode-label" for="studySideMode">
-          <span>Початкова сторона</span>
-         <select id="studySideMode">
-            <option value="front">Сторона 1</option>
-            <option value="back">Сторона 2</option>
-            <option value="random" selected>Довільно</option>
-         </select>
-        </label>
-        <button class="secondary" id="exportCsvBtn" type="button">Експорт CSV</button>
-        <button class="ghost" id="importCsvBtn" type="button">Імпорт CSV</button>
-        <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden />
-        <p class="import-hint">Для CSV з Excel краще “CSV UTF-8”. Імпорт також пробує Windows-1251/1252.</p>
-      </div>
+          <label class="study-mode-label" for="studySideMode">
+            <span data-i18n="app.hero.startSide">Показувати спочатку</span>
+            <span class="select-shell select-shell-side" data-custom-select="studySideMode">
+              <button class="custom-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                <span class="ui-icon" data-custom-select-icon aria-hidden="true"></span>
+                <span data-custom-select-label>Сторона 1</span>
+                <span class="ui-icon ui-icon-dropdown custom-select-chevron" aria-hidden="true"></span>
+              </button>
+              <select id="studySideMode" class="native-select-hidden" tabindex="-1" aria-hidden="true">
+                <option value="front" data-i18n="app.hero.sideFront">Сторона 1</option>
+                <option value="back" data-i18n="app.hero.sideBack">Сторона 2</option>
+                <option value="random" selected data-i18n="app.hero.sideRandom">Довільно</option>
+              </select>
+              <div class="custom-select-menu" role="listbox" hidden></div>
+            </span>
+          </label>
+
+          <button class="primary start-study-button" id="studyBtn">
+            <span class="play-mark" aria-hidden="true"></span>
+            <span data-i18n="app.hero.study">Почати навчання</span>
+          </button>
+        </div>
+      </aside>
+
+      <input id="csvFileInput" type="file" accept=".csv,text/csv" hidden />
     </header>
 
     <section class="study-panel" id="studyPanel" aria-live="polite"></section>
@@ -51,15 +91,17 @@
     <main class="grid">
       <div class="side-column">
         <section class="panel">
-          <h2>Нова картка</h2>
-          <p class="hint">Нові слова автоматично потрапляють у режим “Словник”. У поле приміток можна додати відмінювання, синоніми або приклади.</p>
+          <h2 data-i18n="app.create.title">Нова картка</h2>
+          <p class="hint" data-i18n="app.create.hint">Нові слова автоматично потрапляють у режим “Словник”. У поле приміток можна додати відмінювання, синоніми або приклади.</p>
           <form id="createCardForm">
-            <label for="cardFront">Сторона 1 — слово українською</label>
-            <textarea id="cardFront" required placeholder="Наприклад: говорити"></textarea>
+            <label for="cardFront" data-i18n="app.create.frontLabel">Сторона 1 — слово українською</label>
+            <textarea id="cardFront" required placeholder="Наприклад: говорити" data-i18n-placeholder="app.create.frontPlaceholder"></textarea>
+            <div class="side-suggestions" id="cardFrontSuggestions" hidden></div>
 
-            <label for="cardBack">Сторона 2 — переклад іспанською</label>
-            <textarea id="cardBack" required placeholder="Наприклад: hablar"></textarea>
-            <div class="accent-row" aria-label="Іспанські символи для перекладу">
+            <label for="cardBack" data-i18n="app.create.backLabel">Сторона 2 — переклад іспанською</label>
+            <textarea id="cardBack" required placeholder="Наприклад: hablar" data-i18n-placeholder="app.create.backPlaceholder"></textarea>
+            <div class="side-suggestions" id="cardBackSuggestions" hidden></div>
+            <div class="accent-row" aria-label="Іспанські символи для перекладу" data-i18n-aria-label="app.create.accentAria">
               <button type="button" data-target="cardBack" data-char="á">á</button>
               <button type="button" data-target="cardBack" data-char="é">é</button>
               <button type="button" data-target="cardBack" data-char="í">í</button>
@@ -71,58 +113,68 @@
               <button type="button" data-target="cardBack" data-char="¡">¡</button>
             </div>
 
-            <label for="cardNotes">Примітки, синоніми, відмінювання</label>
-            <textarea id="cardNotes" placeholder="Наприклад: hablo, hablas, habla; синонім: conversar"></textarea>
+            <label for="cardNotes" data-i18n="app.create.notesLabel">Примітки, синоніми, відмінювання</label>
+            <textarea id="cardNotes" placeholder="Наприклад: hablo, hablas, habla; синонім: conversar" data-i18n-placeholder="app.create.notesPlaceholder"></textarea>
 
-            <label>Теги / категорії</label>
-            <div class="tag-picker" id="createTagPicker"></div>
-            <input type="text" id="newTagsInput" placeholder="Нові теги через кому: дієслова, щоденні фрази" />
+            <label data-i18n="app.create.tagsLabel">Теги / категорії</label>
+            <div class="tag-combobox" data-tag-combobox="create">
+              <button class="tag-trigger" id="createTagDropdownButton" type="button" aria-haspopup="listbox" aria-expanded="false" data-tag-combobox-trigger="create">
+                <span id="createTagDropdownLabel" data-i18n="app.tags.dropdownPlaceholder">Оберіть або створіть теги</span>
+                <span class="ui-icon ui-icon-dropdown" aria-hidden="true"></span>
+              </button>
+              <div class="tag-dropdown" id="createTagDropdown" hidden>
+                <input id="createTagSearch" type="text" placeholder="Пошук або новий тег" autocomplete="off" data-i18n-placeholder="app.tags.searchPlaceholder" />
+                <div class="tag-options" id="createTagOptions" role="listbox" aria-multiselectable="true"></div>
+                <button class="create-tag" id="createTagCreateButton" type="button" hidden data-tag-create="create"></button>
+              </div>
+            </div>
+            <div class="selected-tags" id="createSelectedTags"></div>
 
             <div class="full-row">
-              <button class="primary" type="submit">Створити картку</button>
-              <button class="ghost" type="reset">Очистити</button>
+              <button class="primary" type="submit" data-i18n="app.create.submit">Створити картку</button>
+              <button class="ghost" type="reset" data-i18n="app.create.reset">Очистити</button>
             </div>
           </form>
         </section>
 
         <section class="panel">
-          <h2>Теги</h2>
-          <p class="hint">Перейменування тегу автоматично оновлює всі картки. Видалення тегу не видаляє картки.</p>
+          <h2 data-i18n="app.tags.title">Теги</h2>
+          <p class="hint" data-i18n="app.tags.hint">Перейменування тегу автоматично оновлює всі картки. Видалення тегу не видаляє картки.</p>
           <div class="form-row">
-            <input type="text" id="quickTagName" placeholder="Новий тег" />
-            <button class="secondary" id="quickAddTag" type="button">Додати тег</button>
+            <input type="text" id="quickTagName" placeholder="Новий тег" data-i18n-placeholder="app.tags.quickPlaceholder" />
+            <button class="secondary" id="quickAddTag" type="button" data-i18n="app.tags.quickAdd">Додати тег</button>
           </div>
           <div class="tag-list tag-list-spaced" id="tagList"></div>
         </section>
       </div>
 
       <section class="panel">
-        <h2>Список карток</h2>
-        <p class="hint">Обирайте одну, кілька або всі видимі картки. Для групової зміни режиму позначте картки, виберіть режим і натисніть “Режим” або просто виберіть режим у списку.</p>
+        <h2 data-i18n="app.list.title">Список карток</h2>
+        <p class="hint" data-i18n="app.list.hint">Обирайте одну, кілька або всі видимі картки. Для групової зміни режиму позначте картки, виберіть режим і натисніть “Режим” або просто виберіть режим у списку.</p>
 
         <div class="toolbar">
-          <input type="text" id="searchInput" placeholder="Пошук за словом, перекладом, приміткою або тегом" />
+          <input type="text" id="searchInput" placeholder="Пошук за словом, перекладом, приміткою або тегом" data-i18n-placeholder="app.list.searchPlaceholder" />
           <select id="modeFilter">
-            <option value="all">Всі режими</option>
-            <option value="dictionary">Словник</option>
-            <option value="learning">Вивчення</option>
-            <option value="reinforcement">Закріплення</option>
-            <option value="known">Знаю</option>
+            <option value="all" data-i18n="app.list.allModes">Всі режими</option>
+            <option value="dictionary" data-i18n="mode.dictionary">Словник</option>
+            <option value="learning" data-i18n="mode.learning">Вивчення</option>
+            <option value="reinforcement" data-i18n="mode.reinforcement">Закріплення</option>
+            <option value="known" data-i18n="mode.known">Знаю</option>
           </select>
           <select id="sortSelect">
-            <option value="front">За алфавітом Сторони 1</option>
-            <option value="back">За алфавітом Сторони 2</option>
-            <option value="tags">За алфавітом по тегах</option>
-            <option value="mode">За режимом</option>
+            <option value="front" data-i18n="app.list.sortFront">За алфавітом Сторони 1</option>
+            <option value="back" data-i18n="app.list.sortBack">За алфавітом Сторони 2</option>
+            <option value="tags" data-i18n="app.list.sortTags">За алфавітом по тегах</option>
+            <option value="mode" data-i18n="app.list.sortMode">За режимом</option>
           </select>
         </div>
 
         <div class="list-meta" aria-live="polite">
           <div class="page-range" id="pageRangeInfo">0-0 з 0</div>
 
-          <div class="pagination-controls" aria-label="Посторінкова навігація списку карток">
+          <div class="pagination-controls" aria-label="Посторінкова навігація списку карток" data-i18n-aria-label="app.list.paginationAria">
             <label class="page-size-control" for="pageSizeSelect">
-            На сторінці
+            <span data-i18n="app.list.pageSize">На сторінці</span>
               <select id="pageSizeSelect">
                 <option value="50" selected>50</option>
                 <option value="100">100</option>
@@ -131,8 +183,8 @@
               </select>
             </label>
 
-            <button class="mini icon-btn" id="prevPageBtn" type="button" aria-label="Попередня сторінка">‹</button>
-            <button class="mini icon-btn" id="nextPageBtn" type="button" aria-label="Наступна сторінка">›</button>
+            <button class="mini icon-btn" id="prevPageBtn" type="button" aria-label="Попередня сторінка" data-i18n-aria-label="app.list.prevPage"><span class="ui-icon ui-icon-arrow-left" aria-hidden="true"></span></button>
+            <button class="mini icon-btn" id="nextPageBtn" type="button" aria-label="Наступна сторінка" data-i18n-aria-label="app.list.nextPage"><span class="ui-icon ui-icon-arrow-right" aria-hidden="true"></span></button>
           </div>
         </div>
 
@@ -140,23 +192,18 @@
           <div class="selection-summary">
             <small id="selectedInfo">Обрано: 0</small>
             <button class="mini" id="clearSelectionBtn" type="button" disabled>
-              Зняти всі
+              <span data-i18n="app.list.clearSelection">Зняти всі</span>
             </button>
           </div>
           <select id="bulkModeSelect">
-            <option value="">Змінити режим...</option>
-            <option value="dictionary">Словник</option>
-            <option value="learning">Вивчення</option>
-            <option value="reinforcement">Закріплення</option>
-            <option value="known">Знаю</option>
+            <option value="" data-i18n="app.list.bulkModePlaceholder">Змінити режим...</option>
+            <option value="dictionary" data-i18n="mode.dictionary">Словник</option>
+            <option value="learning" data-i18n="mode.learning">Вивчення</option>
+            <option value="reinforcement" data-i18n="mode.reinforcement">Закріплення</option>
+            <option value="known" data-i18n="mode.known">Знаю</option>
           </select>
-          <input type="text" id="bulkTagInput" placeholder="Теги через кому" />
           <div class="bulk-actions">
-            <button class="mini blue" id="bulkApplyMode" type="button">Режим</button>
-            <button class="mini good" id="bulkAddTags" type="button">Додати теги</button>
-            <button class="mini" id="bulkReplaceTags" type="button">Замінити теги</button>
-            <button class="mini" id="bulkRemoveTags" type="button">Прибрати теги</button>
-            <button class="mini danger icon-btn" id="bulkDelete" type="button" aria-label="Видалити обрані картки" title="Видалити обрані картки">🗑</button>
+            <button class="mini danger icon-btn" id="bulkDelete" type="button" aria-label="Видалити обрані картки" title="Видалити обрані картки" data-i18n-aria-label="app.list.deleteSelected" data-i18n-title="app.list.deleteSelected"><span class="ui-icon ui-icon-trash" aria-hidden="true"></span></button>
           </div>
         </div>
 
@@ -169,20 +216,20 @@
     <div class="modal">
       <div class="modal-head">
         <div>
-          <h2 id="editTitle">Редагувати картку</h2>
-          <p class="hint">Можна змінити обидві сторони, примітки, теги та режим.</p>
+          <h2 id="editTitle" data-i18n="app.edit.title">Редагувати картку</h2>
+          <p class="hint" data-i18n="app.edit.hint">Можна змінити обидві сторони, примітки, теги та режим.</p>
         </div>
-        <button class="mini" id="closeCardModal" type="button">Закрити</button>
+        <button class="mini" id="closeCardModal" type="button" data-i18n="app.edit.close">Закрити</button>
       </div>
       <form id="editCardForm">
         <input type="hidden" id="editCardId" />
 
-        <label for="editFront">Сторона 1 — слово українською</label>
+        <label for="editFront" data-i18n="app.edit.frontLabel">Сторона 1 — слово українською</label>
         <textarea id="editFront" required></textarea>
 
-        <label for="editBack">Сторона 2 — переклад іспанською</label>
+        <label for="editBack" data-i18n="app.edit.backLabel">Сторона 2 — переклад іспанською</label>
         <textarea id="editBack" required></textarea>
-        <div class="accent-row" aria-label="Іспанські символи для редагування">
+        <div class="accent-row" aria-label="Іспанські символи для редагування" data-i18n-aria-label="app.edit.accentAria">
           <button type="button" data-target="editBack" data-char="á">á</button>
           <button type="button" data-target="editBack" data-char="é">é</button>
           <button type="button" data-target="editBack" data-char="í">í</button>
@@ -194,24 +241,34 @@
           <button type="button" data-target="editBack" data-char="¡">¡</button>
         </div>
 
-        <label for="editNotes">Примітки, синоніми, відмінювання</label>
+        <label for="editNotes" data-i18n="app.edit.notesLabel">Примітки, синоніми, відмінювання</label>
         <textarea id="editNotes"></textarea>
 
-        <label for="editMode">Режим</label>
+        <label for="editMode" data-i18n="app.edit.modeLabel">Режим</label>
         <select id="editMode">
-          <option value="dictionary">Словник</option>
-          <option value="learning">Вивчення</option>
-          <option value="reinforcement">Закріплення</option>
-          <option value="known">Знаю</option>
+          <option value="dictionary" data-i18n="mode.dictionary">Словник</option>
+          <option value="learning" data-i18n="mode.learning">Вивчення</option>
+          <option value="reinforcement" data-i18n="mode.reinforcement">Закріплення</option>
+          <option value="known" data-i18n="mode.known">Знаю</option>
         </select>
 
-        <label>Теги / категорії</label>
-        <div class="tag-picker" id="editTagPicker"></div>
-        <input type="text" id="editNewTagsInput" placeholder="Нові теги через кому" />
+        <label data-i18n="app.edit.tagsLabel">Теги / категорії</label>
+        <div class="tag-combobox" data-tag-combobox="edit">
+          <button class="tag-trigger" id="editTagDropdownButton" type="button" aria-haspopup="listbox" aria-expanded="false" data-tag-combobox-trigger="edit">
+            <span id="editTagDropdownLabel" data-i18n="app.tags.dropdownPlaceholder">Оберіть або створіть теги</span>
+            <span class="ui-icon ui-icon-dropdown" aria-hidden="true"></span>
+          </button>
+          <div class="tag-dropdown" id="editTagDropdown" hidden>
+            <input id="editTagSearch" type="text" placeholder="Пошук або новий тег" autocomplete="off" data-i18n-placeholder="app.tags.searchPlaceholder" />
+            <div class="tag-options" id="editTagOptions" role="listbox" aria-multiselectable="true"></div>
+            <button class="create-tag" id="editTagCreateButton" type="button" hidden data-tag-create="edit"></button>
+          </div>
+        </div>
+        <div class="selected-tags" id="editSelectedTags"></div>
 
         <div class="full-row">
-          <button class="primary" type="submit">Зберегти зміни</button>
-          <button class="danger icon-btn" id="deleteFromModal" type="button" aria-label="Видалити картку" title="Видалити картку">🗑</button>
+          <button class="primary" type="submit" data-i18n="app.edit.save">Зберегти зміни</button>
+          <button class="danger icon-btn" id="deleteFromModal" type="button" aria-label="Видалити картку" title="Видалити картку" data-i18n-aria-label="app.edit.delete" data-i18n-title="app.edit.delete"><span class="ui-icon ui-icon-trash" aria-hidden="true"></span></button>
         </div>
       </form>
     </div>

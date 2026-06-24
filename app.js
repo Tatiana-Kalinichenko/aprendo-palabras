@@ -1,24 +1,25 @@
 const STORAGE_KEY = "aprendo-espanol-cards-v1";
     const STUDY_SIDE_MODE_KEY = "aprendo-espanol-study-side-mode";
+    const STUDY_SYNC_KEY = "aprendo-palabras-study-state-v1";
     const MAX_LEARNING = 30;
     const MAX_REINFORCEMENT = 100;
     const PAGE_SIZE_KEY = "aprendo-espanol-page-size";
     const PAGE_SIZE_OPTIONS = [50, 100, 200, 500];
     const DEFAULT_PAGE_SIZE = 50;
 
-    const MODE_LABELS = {
-      dictionary: "Словник",
-      learning: "Вивчення",
-      reinforcement: "Закріплення",
-      known: "Знаю"
+    const MODE_LABEL_KEYS = {
+      dictionary: "mode.dictionary",
+      learning: "mode.learning",
+      reinforcement: "mode.reinforcement",
+      known: "mode.known"
     };
 
     const MODE_ORDER = ["dictionary", "learning", "reinforcement", "known"];
 
-    const STUDY_SESSION_LABELS = {
-      learning: "Вивчення",
-      reinforcement: "Закріплення",
-      review: "Повтор"
+    const STUDY_SESSION_LABEL_KEYS = {
+      learning: "session.learning",
+      reinforcement: "session.reinforcement",
+      review: "session.review"
     };
 
     const STUDY_SESSION_CARD_MODES = {
@@ -27,8 +28,41 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       review: "known"
     };
 
+    const t = (key, params = {}) => (
+      window.AprendoI18n ? window.AprendoI18n.t(key, params) : key
+    );
+
+    function getModeLabel(mode) {
+      return t(MODE_LABEL_KEYS[mode] || MODE_LABEL_KEYS.dictionary);
+    }
+
+    function getStudySessionLabel(sessionMode) {
+      return t(STUDY_SESSION_LABEL_KEYS[sessionMode] || STUDY_SESSION_LABEL_KEYS.learning);
+    }
+
+    function getCustomSelectIcon(selectId, value) {
+      const icons = {
+        studySessionMode: {
+          learning: "book",
+          reinforcement: "reinforcement",
+          review: "check"
+        },
+        studySideMode: {
+          front: "side1",
+          back: "side2",
+          random: "random"
+        }
+      };
+
+      return icons[selectId]?.[value] || "dropdown";
+    }
+
     let state = { cards: [], tags: [] };
     let selectedIds = new Set();
+    const tagSelections = {
+      create: new Set(),
+      edit: new Set()
+    };
     let study = null;
     let studyHistory = [];
     let studyDeck = createEmptyStudyDeck();
@@ -37,16 +71,19 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
     let currentPage = 1;
     let pageSize = DEFAULT_PAGE_SIZE;
     let savedStudySideMode = null;
+    let storedStudySnapshot = null;
     let storageBackend = "local";
     let storageWriteQueue = Promise.resolve();
     let storageSyncBound = false;
+    let syncingStudyState = false;
+    let lastStudySyncUpdatedAt = 0;
+    const STUDY_SYNC_SOURCE = `main-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     const $ = (selector) => document.querySelector(selector);
 
     const els = {
       stats: $("#stats"),
       studyBtn: $("#studyBtn"),
-      closeStudyBtn: $("#closeStudyBtn"),
       studySessionMode: $("#studySessionMode"),
       studySideMode: $("#studySideMode"),
       exportCsvBtn: $("#exportCsvBtn"),
@@ -56,9 +93,16 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       createCardForm: $("#createCardForm"),
       cardFront: $("#cardFront"),
       cardBack: $("#cardBack"),
+      cardFrontSuggestions: $("#cardFrontSuggestions"),
+      cardBackSuggestions: $("#cardBackSuggestions"),
       cardNotes: $("#cardNotes"),
-      createTagPicker: $("#createTagPicker"),
-      newTagsInput: $("#newTagsInput"),
+      createTagDropdownButton: $("#createTagDropdownButton"),
+      createTagDropdownLabel: $("#createTagDropdownLabel"),
+      createTagDropdown: $("#createTagDropdown"),
+      createTagSearch: $("#createTagSearch"),
+      createTagOptions: $("#createTagOptions"),
+      createTagCreateButton: $("#createTagCreateButton"),
+      createSelectedTags: $("#createSelectedTags"),
       quickTagName: $("#quickTagName"),
       quickAddTag: $("#quickAddTag"),
       tagList: $("#tagList"),
@@ -72,11 +116,6 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       selectedInfo: $("#selectedInfo"),
       clearSelectionBtn: $("#clearSelectionBtn"),
       bulkModeSelect: $("#bulkModeSelect"),
-      bulkTagInput: $("#bulkTagInput"),
-      bulkApplyMode: $("#bulkApplyMode"),
-      bulkAddTags: $("#bulkAddTags"),
-      bulkReplaceTags: $("#bulkReplaceTags"),
-      bulkRemoveTags: $("#bulkRemoveTags"),
       bulkDelete: $("#bulkDelete"),
       tableWrap: $("#tableWrap"),
       modalBackdrop: $("#cardModalBackdrop"),
@@ -87,8 +126,13 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       editBack: $("#editBack"),
       editNotes: $("#editNotes"),
       editMode: $("#editMode"),
-      editTagPicker: $("#editTagPicker"),
-      editNewTagsInput: $("#editNewTagsInput"),
+      editTagDropdownButton: $("#editTagDropdownButton"),
+      editTagDropdownLabel: $("#editTagDropdownLabel"),
+      editTagDropdown: $("#editTagDropdown"),
+      editTagSearch: $("#editTagSearch"),
+      editTagOptions: $("#editTagOptions"),
+      editTagCreateButton: $("#editTagCreateButton"),
+      editSelectedTags: $("#editSelectedTags"),
       deleteFromModal: $("#deleteFromModal"),
       toast: $("#toast")
     };
@@ -183,13 +227,14 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
         state = normalizeStoredState(readLocalStorageValue(STORAGE_KEY));
         pageSize = normalizePageSize(readLocalStorageValue(PAGE_SIZE_KEY));
         savedStudySideMode = normalizeStudySideMode(readLocalStorageValue(STUDY_SIDE_MODE_KEY));
+        storedStudySnapshot = normalizeStudySnapshot(readLocalStorageValue(STUDY_SYNC_KEY));
         return;
       }
 
       try {
         storageBackend = "extension";
 
-        const stored = await chromeStorageGet([STORAGE_KEY, PAGE_SIZE_KEY, STUDY_SIDE_MODE_KEY]);
+        const stored = await chromeStorageGet([STORAGE_KEY, PAGE_SIZE_KEY, STUDY_SIDE_MODE_KEY, STUDY_SYNC_KEY]);
         const migrated = {};
 
         if (hasOwn(stored, STORAGE_KEY)) {
@@ -215,6 +260,10 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
           }
         }
 
+        if (hasOwn(stored, STUDY_SYNC_KEY)) {
+          storedStudySnapshot = normalizeStudySnapshot(stored[STUDY_SYNC_KEY]);
+        }
+
         if (Object.keys(migrated).length) {
           await chromeStorageSet(migrated);
         }
@@ -224,6 +273,7 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
         state = normalizeStoredState(readLocalStorageValue(STORAGE_KEY));
         pageSize = normalizePageSize(readLocalStorageValue(PAGE_SIZE_KEY));
         savedStudySideMode = normalizeStudySideMode(readLocalStorageValue(STUDY_SIDE_MODE_KEY));
+        storedStudySnapshot = normalizeStudySnapshot(readLocalStorageValue(STUDY_SYNC_KEY));
       }
     }
 
@@ -252,16 +302,134 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       });
     }
 
+    function normalizeStudySnapshot(value) {
+      try {
+        const parsed = typeof value === "string" ? JSON.parse(value) : value;
+        if (!parsed || typeof parsed !== "object") return null;
+
+        return {
+          active: Boolean(parsed.active),
+          source: String(parsed.source || ""),
+          updatedAt: Number(parsed.updatedAt) || 0,
+          sessionMode: STUDY_SESSION_CARD_MODES[parsed.sessionMode] ? parsed.sessionMode : "learning",
+          sideMode: normalizeStudySideMode(parsed.sideMode) || "random",
+          cardId: String(parsed.cardId || ""),
+          side: ["front", "back"].includes(parsed.side) ? parsed.side : "front",
+          flipped: Boolean(parsed.flipped),
+          answer: String(parsed.answer || "")
+        };
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function createStudySnapshot() {
+      const sessionMode = study?.sessionMode || getSelectedStudySessionMode();
+      return {
+        active: Boolean(study),
+        source: STUDY_SYNC_SOURCE,
+        updatedAt: Date.now(),
+        sessionMode,
+        sideMode: els.studySideMode?.value || "random",
+        cardId: study?.cardId || "",
+        side: study?.side || "front",
+        flipped: Boolean(study?.flipped),
+        answer: study?.answer || ""
+      };
+    }
+
+    function publishStudyState() {
+      if (syncingStudyState) return;
+
+      const snapshot = createStudySnapshot();
+      lastStudySyncUpdatedAt = snapshot.updatedAt;
+      saveStoredValue(STUDY_SYNC_KEY, snapshot);
+    }
+
+    function applySharedStudyState(value, options = {}) {
+      const snapshot = normalizeStudySnapshot(value);
+      if (!snapshot) return false;
+      if (!options.force && snapshot.source === STUDY_SYNC_SOURCE) return false;
+      if (!options.force && snapshot.updatedAt <= lastStudySyncUpdatedAt) return false;
+
+      lastStudySyncUpdatedAt = snapshot.updatedAt;
+      syncingStudyState = true;
+
+      if (els.studySessionMode) els.studySessionMode.value = snapshot.sessionMode;
+      if (els.studySideMode) els.studySideMode.value = snapshot.sideMode;
+
+      if (!snapshot.active) {
+        study = null;
+        studyHistory = [];
+        resetStudyDeck(snapshot.sessionMode);
+        renderAll();
+        syncingStudyState = false;
+        return true;
+      }
+
+      const cardMode = getStudyCardMode(snapshot.sessionMode);
+      const card = state.cards.find((item) => item.id === snapshot.cardId && item.mode === cardMode);
+
+      if (!card) {
+        study = null;
+        studyHistory = [];
+        resetStudyDeck(snapshot.sessionMode);
+        renderAll();
+        syncingStudyState = false;
+        return true;
+      }
+
+      study = {
+        sessionMode: snapshot.sessionMode,
+        cardId: snapshot.cardId,
+        side: snapshot.side,
+        flipped: snapshot.flipped,
+        answer: snapshot.answer
+      };
+      resetStudyDeck(snapshot.sessionMode);
+      renderAll();
+      syncingStudyState = false;
+      return true;
+    }
+
     function bindExternalStorageSync() {
-      if (storageSyncBound || storageBackend !== "extension" || !chrome.storage?.onChanged) return;
+      if (storageSyncBound) return;
+
+      if (storageBackend !== "extension") {
+        storageSyncBound = true;
+        window.addEventListener("storage", (event) => {
+          if (event.key === STORAGE_KEY) {
+            state = normalizeStoredState(event.newValue);
+            sortTags();
+            syncingStudyState = true;
+            renderAll();
+            syncingStudyState = false;
+          }
+
+          if (event.key === STUDY_SYNC_KEY) {
+            applySharedStudyState(event.newValue);
+          }
+        });
+        return;
+      }
+
+      if (!chrome.storage?.onChanged) return;
 
       storageSyncBound = true;
       chrome.storage.onChanged.addListener((changes, areaName) => {
-        if (areaName !== "local" || !changes[STORAGE_KEY]) return;
+        if (areaName !== "local") return;
 
-        state = normalizeStoredState(changes[STORAGE_KEY].newValue);
-        sortTags();
-        renderAll();
+        if (changes[STORAGE_KEY]) {
+          state = normalizeStoredState(changes[STORAGE_KEY].newValue);
+          sortTags();
+          syncingStudyState = true;
+          renderAll();
+          syncingStudyState = false;
+        }
+
+        if (changes[STUDY_SYNC_KEY]) {
+          applySharedStudyState(changes[STUDY_SYNC_KEY].newValue);
+        }
       });
     }
 
@@ -283,6 +451,49 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
+    }
+
+    function normalizeSideSuggestionText(value) {
+      return String(value || "")
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLocaleLowerCase("uk");
+    }
+
+    function getSideSuggestionMatches(side, value) {
+      const query = normalizeSideSuggestionText(value);
+      if (!query) return [];
+
+      return state.cards.filter((card) => {
+        const sideText = side === "front" ? card.front : card.back;
+        return normalizeSideSuggestionText(sideText).startsWith(query);
+      });
+    }
+
+    function renderSideSuggestionList(container, matches) {
+      if (!container) return;
+
+      if (!matches.length) {
+        container.hidden = true;
+        container.innerHTML = "";
+        return;
+      }
+
+      container.hidden = false;
+      container.innerHTML = matches.map((card) => `
+        <div class="side-suggestion">${escapeHtml(card.front)} &mdash; ${escapeHtml(card.back)}</div>
+      `).join("");
+    }
+
+    function renderCreateSideSuggestions() {
+      renderSideSuggestionList(
+        els.cardFrontSuggestions,
+        getSideSuggestionMatches("front", els.cardFront.value)
+      );
+      renderSideSuggestionList(
+        els.cardBackSuggestions,
+        getSideSuggestionMatches("back", els.cardBack.value)
+      );
     }
 
     function multiline(value) {
@@ -335,7 +546,7 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
     }
 
     function getPrimaryTagName(card) {
-      return getTagNames(card)[0] || "Без тегів";
+      return getTagNames(card)[0] || t("app.tags.noTags");
     }
 
     function isExistingCardId(id) {
@@ -359,7 +570,7 @@ const STORAGE_KEY = "aprendo-espanol-cards-v1";
       selectedIds = new Set(Array.from(selectedIds).filter(isExistingCardId));
 
       const selectedCount = selectedIds.size;
-      els.selectedInfo.textContent = `Обрано: ${selectedCount}`;
+      els.selectedInfo.textContent = t("app.list.selected", { count: selectedCount });
 
       if (els.clearSelectionBtn) {
         els.clearSelectionBtn.disabled = selectedCount === 0;
@@ -394,10 +605,6 @@ function resetStudyDeck(sessionMode = null) {
 
 function getStudyCardMode(sessionMode) {
   return STUDY_SESSION_CARD_MODES[sessionMode] || STUDY_SESSION_CARD_MODES.learning;
-}
-
-function getStudySessionLabel(sessionMode) {
-  return STUDY_SESSION_LABELS[sessionMode] || STUDY_SESSION_LABELS.learning;
 }
 
 function shuffleIds(ids) {
@@ -445,7 +652,6 @@ function buildStudyCycle(ids, previousCycleIds, previousId) {
 function setStudyCard(card, options = {}) {
   const {
   rememberCurrent = true,
-  scroll = true,
   sessionMode = study?.sessionMode || getSelectedStudySessionMode()
 } = options;
 
@@ -462,10 +668,7 @@ function setStudyCard(card, options = {}) {
 };
 
   renderAll();
-
-  if (scroll) {
-    els.studyPanel.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  publishStudyState();
 }
 
     function getModeLimit(mode) {
@@ -476,11 +679,11 @@ function setStudyCard(card, options = {}) {
 
 function getModeLimitMessage(mode) {
   if (mode === "learning") {
-    return `У режимі “Вивчення” може бути не більше ${MAX_LEARNING} карток.`;
+    return t("toast.modeLimit.learning", { limit: MAX_LEARNING });
   }
 
   if (mode === "reinforcement") {
-    return `У режимі “Закріплення” може бути не більше ${MAX_REINFORCEMENT} карток.`;
+    return t("toast.modeLimit.reinforcement", { limit: MAX_REINFORCEMENT });
   }
 
   return "";
@@ -549,55 +752,197 @@ function getSelectedStudySessionMode() {
 
     function renderAll() {
       selectedIds = new Set(Array.from(selectedIds).filter((id) => state.cards.some((card) => card.id === id)));
+      syncCustomSelects();
       renderStats();
       renderTagPickers();
       renderTagList();
       renderCardList();
+      renderCreateSideSuggestions();
       renderStudy();
       updateStudyButton();
     }
 
+    function closeCustomSelects() {
+      document.querySelectorAll("[data-custom-select]").forEach((shell) => {
+        const trigger = shell.querySelector(".custom-select-trigger");
+        const menu = shell.querySelector(".custom-select-menu");
+        if (menu) menu.hidden = true;
+        if (trigger) trigger.setAttribute("aria-expanded", "false");
+      });
+    }
+
+    function syncCustomSelect(selectId) {
+      const select = document.getElementById(selectId);
+      const shell = document.querySelector(`[data-custom-select="${selectId}"]`);
+      if (!select || !shell) return;
+
+      const selectedOption = select.options[select.selectedIndex] || select.options[0];
+      const icon = shell.querySelector("[data-custom-select-icon]");
+      const label = shell.querySelector("[data-custom-select-label]");
+      const menu = shell.querySelector(".custom-select-menu");
+
+      if (icon) {
+        icon.className = `ui-icon ui-icon-${getCustomSelectIcon(selectId, select.value)}`;
+      }
+
+      if (label && selectedOption) {
+        label.textContent = selectedOption.textContent;
+      }
+
+      if (menu) {
+        menu.innerHTML = Array.from(select.options).map((option) => {
+          const isSelected = option.value === select.value;
+          return `
+            <button class="custom-select-option ${isSelected ? "is-selected" : ""}" type="button" role="option" aria-selected="${isSelected ? "true" : "false"}" data-custom-option="${escapeHtml(selectId)}" data-value="${escapeHtml(option.value)}">
+              <span class="ui-icon ui-icon-${escapeHtml(getCustomSelectIcon(selectId, option.value))}" aria-hidden="true"></span>
+              <span>${escapeHtml(option.textContent)}</span>
+            </button>
+          `;
+        }).join("");
+      }
+    }
+
+    function syncCustomSelects() {
+      syncCustomSelect("studySessionMode");
+      syncCustomSelect("studySideMode");
+    }
+
     function renderStats() {
-  const counts = {
-    dictionary: state.cards.filter((card) => card.mode === "dictionary").length,
-    learning: state.cards.filter((card) => card.mode === "learning").length,
-    reinforcement: state.cards.filter((card) => card.mode === "reinforcement").length,
-    known: state.cards.filter((card) => card.mode === "known").length
-  };
-
-  els.stats.innerHTML = `
-    <span class="stat"><strong>${state.cards.length}</strong> карток усього</span>
-    <span class="stat"><strong>${counts.dictionary}</strong> у Словнику</span>
-    <span class="stat"><strong>${counts.learning}/${MAX_LEARNING}</strong> у Вивченні</span>
-    <span class="stat"><strong>${counts.reinforcement}/${MAX_REINFORCEMENT}</strong> у Закріпленні</span>
-    <span class="stat"><strong>${counts.known}</strong> Знаю</span>
-    <span class="stat"><strong>${state.tags.length}</strong> тегів</span>
-`;
-}
-
-    function renderTagPickers() {
-      const renderPicker = (container, name, selected = []) => {
-        if (!state.tags.length) {
-          container.innerHTML = `<p class="muted-text">Тегів ще немає. Створіть нові через поле нижче.</p>`;
-          return;
-        }
-
-        container.innerHTML = state.tags.map((tag) => `
-          <label class="tag-check">
-            <input type="checkbox" name="${name}" value="${escapeHtml(tag.id)}" ${selected.includes(tag.id) ? "checked" : ""}>
-            ${escapeHtml(tag.name)}
-          </label>
-        `).join("");
+      const counts = {
+        dictionary: state.cards.filter((card) => card.mode === "dictionary").length,
+        learning: state.cards.filter((card) => card.mode === "learning").length,
+        reinforcement: state.cards.filter((card) => card.mode === "reinforcement").length,
+        known: state.cards.filter((card) => card.mode === "known").length
       };
 
-      renderPicker(els.createTagPicker, "createTags");
-      const editCard = state.cards.find((card) => card.id === els.editCardId.value);
-      renderPicker(els.editTagPicker, "editTags", editCard ? editCard.tagIds || [] : []);
+      const statItems = [
+        { key: "total", icon: "cards", label: t("app.stats.totalLabel"), value: state.cards.length },
+        { key: "dictionary", icon: "books", label: t("app.stats.dictionaryLabel"), value: counts.dictionary },
+        { key: "learning", icon: "book", label: t("app.stats.learningLabel"), value: `${counts.learning}/${MAX_LEARNING}` },
+        { key: "reinforcement", icon: "reinforcement", label: t("app.stats.reinforcementLabel"), value: `${counts.reinforcement}/${MAX_REINFORCEMENT}` },
+        { key: "known", icon: "check", label: t("app.stats.knownLabel"), value: counts.known }
+      ];
+
+      els.stats.innerHTML = statItems.map((item) => `
+        <article class="stat stat-${escapeHtml(item.key)}">
+          <span class="stat-icon ui-icon ui-icon-${escapeHtml(item.icon)}" aria-hidden="true"></span>
+          <span class="stat-label">${escapeHtml(item.label)}</span>
+          <strong>${escapeHtml(item.value)}</strong>
+        </article>
+      `).join("");
+    }
+
+    function getTagCombobox(type) {
+      if (type === "edit") {
+        return {
+          button: els.editTagDropdownButton,
+          label: els.editTagDropdownLabel,
+          dropdown: els.editTagDropdown,
+          search: els.editTagSearch,
+          options: els.editTagOptions,
+          createButton: els.editTagCreateButton,
+          selected: els.editSelectedTags
+        };
+      }
+
+      return {
+        button: els.createTagDropdownButton,
+        label: els.createTagDropdownLabel,
+        dropdown: els.createTagDropdown,
+        search: els.createTagSearch,
+        options: els.createTagOptions,
+        createButton: els.createTagCreateButton,
+        selected: els.createSelectedTags
+      };
+    }
+
+    function getSelectedTagIds(type) {
+      const existingIds = new Set(state.tags.map((tag) => tag.id));
+      tagSelections[type] = new Set(Array.from(tagSelections[type] || []).filter((id) => existingIds.has(id)));
+      return Array.from(tagSelections[type]);
+    }
+
+    function getSelectedTags(type) {
+      const selectedIds = new Set(getSelectedTagIds(type));
+      return state.tags.filter((tag) => selectedIds.has(tag.id));
+    }
+
+    function closeTagDropdown(type) {
+      const ui = getTagCombobox(type);
+      if (!ui.dropdown) return;
+      ui.dropdown.hidden = true;
+      ui.button.setAttribute("aria-expanded", "false");
+    }
+
+    function closeAllTagDropdowns() {
+      closeTagDropdown("create");
+      closeTagDropdown("edit");
+    }
+
+    function openTagDropdown(type) {
+      const ui = getTagCombobox(type);
+      if (!ui.dropdown) return;
+      closeAllTagDropdowns();
+      ui.dropdown.hidden = false;
+      ui.button.setAttribute("aria-expanded", "true");
+      renderTagCombobox(type);
+      ui.search.focus();
+    }
+
+    function toggleTagDropdown(type) {
+      const ui = getTagCombobox(type);
+      if (!ui.dropdown) return;
+      if (ui.dropdown.hidden) openTagDropdown(type);
+      else closeTagDropdown(type);
+    }
+
+    function renderTagCombobox(type) {
+      const ui = getTagCombobox(type);
+      if (!ui.button) return;
+
+      const selectedTags = getSelectedTags(type);
+      ui.label.innerHTML = selectedTags.length
+        ? `<strong>${selectedTags.length}</strong> ${escapeHtml(t("app.tags.selected", { count: selectedTags.length })).replace(String(selectedTags.length), "").trim()}`
+        : escapeHtml(t("app.tags.dropdownPlaceholder"));
+
+      ui.selected.innerHTML = selectedTags.map((tag) => `
+        <button class="selected-tag" type="button" data-tag-remove="${escapeHtml(type)}" data-tag-id="${escapeHtml(tag.id)}" aria-label="${escapeHtml(t("app.tags.removeTag", { name: tag.name }))}">
+          <span>${escapeHtml(tag.name)}</span>
+          <span aria-hidden="true">×</span>
+        </button>
+      `).join("");
+      ui.selected.classList.toggle("is-empty", !selectedTags.length);
+
+      const query = normalize(ui.search.value);
+      const filteredTags = state.tags.filter((tag) => !query || normalize(tag.name).includes(query));
+      const selectedIds = new Set(getSelectedTagIds(type));
+
+      ui.options.innerHTML = filteredTags.length
+        ? filteredTags.map((tag) => {
+          const selected = selectedIds.has(tag.id);
+          return `
+            <button class="tag-option ${selected ? "is-selected" : ""}" type="button" role="option" aria-selected="${selected ? "true" : "false"}" data-tag-option="${escapeHtml(type)}" data-tag-id="${escapeHtml(tag.id)}">
+              <span class="ui-icon ui-icon-check" aria-hidden="true"></span>
+              <span>${escapeHtml(tag.name)}</span>
+            </button>
+          `;
+        }).join("")
+        : `<div class="empty-tags">${escapeHtml(t("app.tags.emptySearch"))}</div>`;
+
+      const rawName = ui.search.value.trim();
+      const canCreate = rawName && !state.tags.some((tag) => normalize(tag.name) === normalize(rawName));
+      ui.createButton.hidden = !canCreate;
+      ui.createButton.textContent = canCreate ? t("app.tags.createTag", { name: rawName }) : "";
+    }
+
+    function renderTagPickers() {
+      renderTagCombobox("create");
+      renderTagCombobox("edit");
     }
 
     function renderTagList() {
       if (!state.tags.length) {
-        els.tagList.innerHTML = `<div class="empty">Теги ще не створені.</div>`;
+        els.tagList.innerHTML = `<div class="empty">${escapeHtml(t("app.tags.emptyList"))}</div>`;
         return;
       }
 
@@ -607,11 +952,11 @@ function getSelectedStudySessionMode() {
           <div class="tag-line">
             <div>
               <strong>${escapeHtml(tag.name)}</strong>
-              <div class="muted-text">${count} карт.</div>
+              <div class="muted-text">${escapeHtml(t("app.tags.countAbbr", { count }))}</div>
             </div>
             <div class="row-actions">
-              <button class="mini icon-btn" data-tag-action="rename" data-tag-id="${escapeHtml(tag.id)}" aria-label="Редагувати тег" title="Редагувати тег">✎</button>
-              <button class="mini danger icon-btn" data-tag-action="delete" data-tag-id="${escapeHtml(tag.id)}" aria-label="Видалити тег" title="Видалити тег">🗑</button>
+              <button class="mini icon-btn" data-tag-action="rename" data-tag-id="${escapeHtml(tag.id)}" aria-label="${escapeHtml(t("app.tags.renameAria"))}" title="${escapeHtml(t("app.tags.renameAria"))}"><span class="ui-icon ui-icon-edit" aria-hidden="true"></span></button>
+              <button class="mini danger icon-btn" data-tag-action="delete" data-tag-id="${escapeHtml(tag.id)}" aria-label="${escapeHtml(t("app.tags.deleteAria"))}" title="${escapeHtml(t("app.tags.deleteAria"))}"><span class="ui-icon ui-icon-trash" aria-hidden="true"></span></button>
             </div>
           </div>
         `;
@@ -682,8 +1027,8 @@ function getSelectedStudySessionMode() {
       }
 
       els.pageRangeInfo.textContent = totalFiltered
-      ? `${startIndex + 1}-${endIndex} з ${totalFiltered}`
-        : "0-0 з 0";
+      ? t("app.list.pageRange", { from: startIndex + 1, to: endIndex, total: totalFiltered })
+        : t("app.list.pageRangeEmpty");
 
       els.prevPageBtn.disabled = currentPage <= 1 || totalFiltered === 0;
       els.nextPageBtn.disabled = currentPage >= pageCount || totalFiltered === 0;
@@ -696,13 +1041,13 @@ function getSelectedStudySessionMode() {
 
     function clearAllSelections() {
       if (!selectedIds.size) {
-        showToast("Немає обраних карток.");
+        showToast(t("toast.noSelectedCards"));
         return;
       }
 
       selectedIds.clear();
       renderCardList();
-      showToast("Усі виділення знято.");
+      showToast(t("toast.selectionCleared"));
     }
 
     function renderCardList() {
@@ -720,12 +1065,12 @@ function getSelectedStudySessionMode() {
       updatePaginationControls(visible.length, startIndex, endIndex, pageCount);
 
       if (!state.cards.length) {
-        els.tableWrap.innerHTML = `<div class="empty">Поки що немає жодної картки. Створіть першу зліва.</div>`;
+        els.tableWrap.innerHTML = `<div class="empty">${escapeHtml(t("app.list.emptyCards"))}</div>`;
         return;
       }
 
       if (!visible.length) {
-        els.tableWrap.innerHTML = `<div class="empty">За поточним пошуком нічого не знайдено.</div>`;
+        els.tableWrap.innerHTML = `<div class="empty">${escapeHtml(t("app.list.emptySearch"))}</div>`;
         return;
       }
 
@@ -734,13 +1079,13 @@ function getSelectedStudySessionMode() {
       const rows = [];
 
       for (const card of pageCards) {
-        const group = sort === "tags" ? getPrimaryTagName(card) : sort === "mode" ? MODE_LABELS[card.mode] : null;
+        const group = sort === "tags" ? getPrimaryTagName(card) : sort === "mode" ? getModeLabel(card.mode) : null;
         if (group && group !== lastGroup) {
-          rows.push(`<tr class="group-row"><td colspan="8">${escapeHtml(group)}</td></tr>`);
+          rows.push(`<tr class="group-row"><td colspan="7">${escapeHtml(group)}</td></tr>`);
           lastGroup = group;
         }
 
-        const tagsHtml = getTagNames(card).map((name) => `<span class="tag">${escapeHtml(name)}</span>`).join("") || `<span class="muted-text">Без тегів</span>`;
+        const tagsHtml = getTagNames(card).map((name) => `<span class="tag">${escapeHtml(name)}</span>`).join("") || `<span class="muted-text">${escapeHtml(t("app.tags.noTags"))}</span>`;
         const notes = card.notes ? `<div class="muted-text">${multiline(card.notes)}</div>` : `<span class="muted-text">—</span>`;
 
         rows.push(`
@@ -750,21 +1095,20 @@ function getSelectedStudySessionMode() {
             </td>
             <td class="word-cell">${multiline(card.front)}</td>
             <td class="word-cell">${multiline(card.back)}</td>
-            <td>${notes}</td>
-            <td>${tagsHtml}</td>
-            <td><span class="mode-badge mode-${escapeHtml(card.mode)}">${MODE_LABELS[card.mode]}</span></td>
             <td>
-              <select data-card-action="mode" data-card-id="${escapeHtml(card.id)}" aria-label="Змінити режим картки">
-                <option value="dictionary" ${card.mode === "dictionary" ? "selected" : ""}>Словник</option>
-                <option value="learning" ${card.mode === "learning" ? "selected" : ""}>Вивчення</option>
-                <option value="reinforcement" ${card.mode === "reinforcement" ? "selected" : ""}>Закріплення</option>
-                <option value="known" ${card.mode === "known" ? "selected" : ""}>Знаю</option>
+              <select data-card-action="mode" data-card-id="${escapeHtml(card.id)}" aria-label="${escapeHtml(t("app.list.changeModeAria"))}">
+                <option value="dictionary" ${card.mode === "dictionary" ? "selected" : ""}>${escapeHtml(getModeLabel("dictionary"))}</option>
+                <option value="learning" ${card.mode === "learning" ? "selected" : ""}>${escapeHtml(getModeLabel("learning"))}</option>
+                <option value="reinforcement" ${card.mode === "reinforcement" ? "selected" : ""}>${escapeHtml(getModeLabel("reinforcement"))}</option>
+                <option value="known" ${card.mode === "known" ? "selected" : ""}>${escapeHtml(getModeLabel("known"))}</option>
               </select>
             </td>
+            <td>${notes}</td>
+            <td>${tagsHtml}</td>
             <td>
               <div class="row-actions">
-                <button class="mini icon-btn" data-card-action="edit" data-card-id="${escapeHtml(card.id)}" aria-label="Редагувати картку" title="Редагувати картку">✎</button>
-                <button class="mini danger icon-btn" data-card-action="delete" data-card-id="${escapeHtml(card.id)}" aria-label="Видалити картку" title="Видалити картку">🗑</button>
+                <button class="mini icon-btn" data-card-action="edit" data-card-id="${escapeHtml(card.id)}" aria-label="${escapeHtml(t("app.list.editCard"))}" title="${escapeHtml(t("app.list.editCard"))}"><span class="ui-icon ui-icon-edit" aria-hidden="true"></span></button>
+                <button class="mini danger icon-btn" data-card-action="delete" data-card-id="${escapeHtml(card.id)}" aria-label="${escapeHtml(t("app.list.deleteCard"))}" title="${escapeHtml(t("app.list.deleteCard"))}"><span class="ui-icon ui-icon-trash" aria-hidden="true"></span></button>
               </div>
             </td>
           </tr>
@@ -777,22 +1121,20 @@ function getSelectedStudySessionMode() {
             <col class="select-col">
             <col class="word-col">
             <col class="word-col">
+            <col class="change-col">
             <col class="notes-col">
             <col class="tags-col">
-            <col class="mode-col">
-            <col class="change-col">
             <col class="actions-col">
           </colgroup>
           <thead>
             <tr>
-              <th><input type="checkbox" id="selectAllVisible" ${allVisibleSelected ? "checked" : ""} aria-label="Обрати всі видимі картки"></th>
-              <th>${sortHeaderButton("front", "Сторона 1", sort)}</th>
-              <th>${sortHeaderButton("back", "Сторона 2", sort)}</th>
-              <th>Примітки</th>
-              <th>${sortHeaderButton("tags", "Теги", sort)}</th>
-              <th>${sortHeaderButton("mode", "Режим", sort)}</th>
-              <th>Змінити</th>
-              <th>Дії</th>
+              <th><input type="checkbox" id="selectAllVisible" ${allVisibleSelected ? "checked" : ""} aria-label="${escapeHtml(t("app.list.selectAllVisible"))}"></th>
+              <th>${sortHeaderButton("front", t("app.list.headerFront"), sort)}</th>
+              <th>${sortHeaderButton("back", t("app.list.headerBack"), sort)}</th>
+              <th>${escapeHtml(t("app.list.headerChange"))}</th>
+              <th>${escapeHtml(t("app.list.headerNotes"))}</th>
+              <th>${sortHeaderButton("tags", t("app.list.headerTags"), sort)}</th>
+              <th>${escapeHtml(t("app.list.headerActions"))}</th>
             </tr>
           </thead>
           <tbody>${rows.join("")}</tbody>
@@ -807,8 +1149,27 @@ function getSelectedStudySessionMode() {
       const sessionLabel = getStudySessionLabel(sessionMode);
 
       els.studyBtn.disabled = cardsCount < 1;
-     els.studyBtn.textContent = cardsCount < 1 ? `Немає карток: ${sessionLabel}` : "Вчити";
-     els.closeStudyBtn.style.display = study ? "block" : "none";
+     els.studyBtn.innerHTML = cardsCount < 1
+       ? `<span>${escapeHtml(t("app.study.noCards", { mode: sessionLabel }))}</span>`
+       : study
+         ? `<span class="stop-mark" aria-hidden="true"></span><span>${escapeHtml(t("app.hero.stopStudy"))}</span>`
+         : `<span class="play-mark" aria-hidden="true"></span><span>${escapeHtml(t("app.hero.study"))}</span>`;
+    }
+
+    function studyModeButton(action, label, direction, tone = "") {
+      const cleanLabel = String(label || "").replace(/^<-\s*/, "").replace(/\s*->$/, "");
+      const leftIcon = direction === "left"
+        ? '<span class="ui-icon ui-icon-arrow-left" aria-hidden="true"></span>'
+        : "";
+      const rightIcon = direction === "right"
+        ? '<span class="ui-icon ui-icon-arrow-right" aria-hidden="true"></span>'
+        : "";
+
+      return `
+        <button class="mini ${tone}" data-study-action="${escapeHtml(action)}" type="button">
+          ${leftIcon}<span>${escapeHtml(cleanLabel)}</span>${rightIcon}
+        </button>
+      `;
     }
 
 function renderStudy() {
@@ -834,8 +1195,8 @@ function renderStudy() {
     : study.side;
 
   const label = showingSide === "front"
-    ? "Сторона 1 — українською"
-    : "Сторона 2 — іспанською";
+    ? t("app.study.sideFront")
+    : t("app.study.sideBack");
 
   const text = showingSide === "front" ? card.front : card.back;
 
@@ -845,28 +1206,28 @@ function renderStudy() {
 
   const modeControls = sessionMode === "reinforcement"
     ? `
-      <button class="mini blue" data-study-action="dictionary" type="button">&lt;- Словник</button>
-      <button class="mini" data-study-action="learning" type="button">&lt;- Вчити</button>
-      <button class="mini good" data-study-action="known" type="button">Знаю -&gt;</button>
+      ${studyModeButton("dictionary", t("app.study.toDictionary"), "left", "blue")}
+      ${studyModeButton("learning", t("app.study.toLearning"), "left")}
+      ${studyModeButton("known", t("app.study.toKnown"), "right", "good")}
     `
     : `
-      <button class="mini blue" data-study-action="dictionary" type="button">&lt;- Словник</button>
-      <button class="mini good" data-study-action="reinforcement" type="button">Закріпити -&gt;</button>
+      ${studyModeButton("dictionary", t("app.study.toDictionary"), "left", "blue")}
+      ${studyModeButton("reinforcement", t("app.study.toReinforcement"), "right", "good")}
     `;
 
   const controls = `
-    <label for="studyAnswer">Ваш переклад, якщо хочете перевірити себе</label>
+    <label for="studyAnswer">${escapeHtml(t("app.study.answerLabel"))}</label>
 
-    <textarea id="studyAnswer" class="answer-box" placeholder="Поле необовʼязкове. Напишіть переклад і натисніть кнопку перевороту.">${escapeHtml(study.answer)}</textarea>
+    <textarea id="studyAnswer" class="answer-box" placeholder="${escapeHtml(t("app.study.answerPlaceholder"))}">${escapeHtml(study.answer)}</textarea>
 
     <div class="study-icon-row">
-      <button class="ghost icon-btn study-nav-icon" data-study-action="previous" type="button" aria-label="Попередня картка" title="Попередня картка">←</button>
+      <button class="ghost icon-btn study-nav-icon" data-study-action="previous" type="button" aria-label="${escapeHtml(t("app.study.previous"))}" title="${escapeHtml(t("app.study.previous"))}"><span class="ui-icon ui-icon-arrow-left" aria-hidden="true"></span></button>
 
-      <button class="primary icon-btn study-nav-icon" data-study-action="flip" type="button" aria-label="Перевернути" title="Перевернути">↻</button>
+      <button class="primary icon-btn study-nav-icon study-flip-icon" data-study-action="flip" type="button" aria-label="${escapeHtml(t("app.study.flip"))}" title="${escapeHtml(t("app.study.flip"))}"><span class="ui-icon ui-icon-flip" aria-hidden="true"></span></button>
 
-      <button class="ghost icon-btn study-nav-icon" data-study-action="next" type="button" aria-label="Наступна картка" title="Наступна картка">→</button>
+      <button class="ghost icon-btn study-nav-icon" data-study-action="next" type="button" aria-label="${escapeHtml(t("app.study.next"))}" title="${escapeHtml(t("app.study.next"))}"><span class="ui-icon ui-icon-arrow-right" aria-hidden="true"></span></button>
 
-      <button class="mini icon-btn study-nav-icon" data-study-action="edit" type="button" aria-label="Редагувати картку" title="Редагувати картку">✎</button>
+      <button class="mini icon-btn study-nav-icon" data-study-action="edit" type="button" aria-label="${escapeHtml(t("app.list.editCard"))}" title="${escapeHtml(t("app.list.editCard"))}"><span class="ui-icon ui-icon-edit" aria-hidden="true"></span></button>
     </div>
 
     <div class="study-mode-row">
@@ -883,9 +1244,10 @@ function renderStudy() {
       </div>
 
       <div class="study-controls">
-        <div>
-          <h2 class="study-title">Режим: ${escapeHtml(getStudySessionLabel(sessionMode))}</h2>
-          <p class="hint study-hint">Категорії тут не показуються, щоб не підказувати відповідь.</p>
+        <div class="study-controls-head">
+          <h2 class="study-title">${escapeHtml(t("app.study.modeTitle", { mode: getStudySessionLabel(sessionMode) }))}</h2>
+          <p class="hint study-hint">${escapeHtml(t("app.study.hint"))}</p>
+          <button class="ghost study-mini-link" data-study-action="mini-window" type="button">${escapeHtml(t("app.study.openMiniWindow"))}</button>
         </div>
 
         ${controls}
@@ -894,8 +1256,30 @@ function renderStudy() {
   `;
 }
 
-    function getCheckedTagIds(container) {
-      return Array.from(container.querySelectorAll("input[type='checkbox']:checked")).map((input) => input.value);
+    function toggleTagSelection(type, tagId) {
+      if (!tagSelections[type]) return;
+      if (tagSelections[type].has(tagId)) tagSelections[type].delete(tagId);
+      else tagSelections[type].add(tagId);
+      renderTagCombobox(type);
+    }
+
+    function removeTagSelection(type, tagId) {
+      if (!tagSelections[type]) return;
+      tagSelections[type].delete(tagId);
+      renderTagCombobox(type);
+    }
+
+    function createTagFromCombobox(type) {
+      const ui = getTagCombobox(type);
+      const name = ui.search.value.trim();
+      if (!name) return;
+
+      const [tagId] = ensureTags([name]);
+      tagSelections[type].add(tagId);
+      ui.search.value = "";
+      saveState();
+      renderAll();
+      openTagDropdown(type);
     }
 
     function createCard(event) {
@@ -904,14 +1288,11 @@ function renderStudy() {
       const front = els.cardFront.value.trim();
       const back = els.cardBack.value.trim();
       if (!front || !back) {
-        showToast("Заповніть обидві сторони картки.");
+        showToast(t("toast.fillBothSides"));
         return;
       }
 
-      const tagIds = [
-        ...getCheckedTagIds(els.createTagPicker),
-        ...ensureTags(splitTags(els.newTagsInput.value))
-      ];
+      const tagIds = getSelectedTagIds("create");
 
       state.cards.push({
         id: uid("card"),
@@ -926,8 +1307,9 @@ function renderStudy() {
 
       saveState();
       els.createCardForm.reset();
+      tagSelections.create.clear();
       renderAll();
-      showToast("Картку створено в режимі “Словник”.");
+      showToast(t("toast.cardCreatedDictionary"));
     }
 
     function openCardModal(cardId) {
@@ -939,7 +1321,8 @@ function renderStudy() {
       els.editBack.value = card.back;
       els.editNotes.value = card.notes || "";
       els.editMode.value = card.mode;
-      els.editNewTagsInput.value = "";
+      tagSelections.edit = new Set(card.tagIds || []);
+      if (els.editTagSearch) els.editTagSearch.value = "";
       renderTagPickers();
       els.modalBackdrop.classList.add("active");
       els.editFront.focus();
@@ -949,6 +1332,8 @@ function renderStudy() {
       els.modalBackdrop.classList.remove("active");
       els.editCardForm.reset();
       els.editCardId.value = "";
+      tagSelections.edit.clear();
+      closeAllTagDropdowns();
     }
 
     function saveCardEdit(event) {
@@ -964,10 +1349,7 @@ function renderStudy() {
         return;
       }
 
-      const tagIds = [
-        ...getCheckedTagIds(els.editTagPicker),
-        ...ensureTags(splitTags(els.editNewTagsInput.value))
-      ];
+      const tagIds = getSelectedTagIds("edit");
 
       card.front = els.editFront.value.trim();
       card.back = els.editBack.value.trim();
@@ -977,24 +1359,24 @@ function renderStudy() {
       card.updatedAt = new Date().toISOString();
 
       if (!card.front || !card.back) {
-        showToast("Обидві сторони картки мають бути заповнені.");
+        showToast(t("toast.fillBothSides"));
         return;
       }
 
       saveState();
       closeCardModal();
       renderAll();
-      showToast("Картку оновлено.");
+      showToast(t("toast.cardUpdated"));
     }
 
     function deleteCards(ids) {
       const idList = Array.from(ids);
       if (!idList.length) {
-        showToast("Спочатку оберіть картки.");
+        showToast(t("toast.selectCardsFirst"));
         return;
       }
 
-      const confirmed = confirm(`Видалити картки: ${idList.length}? Цю дію неможливо скасувати.`);
+      const confirmed = confirm(t("confirm.deleteCards", { count: idList.length }));
       if (!confirmed) return;
 
       state.cards = state.cards.filter((card) => !idList.includes(card.id));
@@ -1008,18 +1390,19 @@ function renderStudy() {
 
       saveState();
       renderAll();
-      showToast("Картки видалено.");
+      publishStudyState();
+      showToast(t("toast.cardsDeleted"));
     }
 
     function moveCards(ids, mode) {
-      if (!MODE_LABELS[mode]) {
-        showToast("Оберіть коректний режим.");
+      if (!MODE_LABEL_KEYS[mode]) {
+        showToast(t("toast.chooseValidMode"));
         return false;
       }
 
       const idList = Array.from(new Set(Array.from(ids).filter(isExistingCardId)));
       if (!idList.length) {
-        showToast("Спочатку оберіть картки.");
+        showToast(t("toast.selectCardsFirst"));
         return false;
       }
 
@@ -1050,63 +1433,28 @@ function renderStudy() {
       saveState();
       renderAll();
       const message = changedCount
-        ? `Режим змінено: ${MODE_LABELS[mode]} (${changedCount}).`
-        : `Обрані картки вже були в режимі “${MODE_LABELS[mode]}”.`;
+        ? t("toast.modeChanged", { mode: getModeLabel(mode), count: changedCount })
+        : t("toast.modeUnchanged", { mode: getModeLabel(mode) });
       showToast(message);
       return true;
-    }
-
-    function applyTagChange(ids, action) {
-      const idList = Array.from(ids);
-      if (!idList.length) {
-        showToast("Спочатку оберіть картки.");
-        return;
-      }
-
-      const names = splitTags(els.bulkTagInput.value);
-      if (!names.length) {
-        showToast("Введіть один або кілька тегів через кому.");
-        return;
-      }
-
-      const tagIds = ensureTags(names);
-
-      for (const card of state.cards) {
-        if (!idList.includes(card.id)) continue;
-
-        if (action === "replace") {
-          card.tagIds = Array.from(new Set(tagIds));
-        } else if (action === "add") {
-          card.tagIds = Array.from(new Set([...(card.tagIds || []), ...tagIds]));
-        } else if (action === "remove") {
-          card.tagIds = (card.tagIds || []).filter((id) => !tagIds.includes(id));
-        }
-
-        card.updatedAt = new Date().toISOString();
-      }
-
-      els.bulkTagInput.value = "";
-      saveState();
-      renderAll();
-      showToast("Теги оновлено.");
     }
 
     function renameTag(tagId) {
       const tag = state.tags.find((item) => item.id === tagId);
       if (!tag) return;
 
-      const name = prompt("Нова назва тегу:", tag.name);
+      const name = prompt(t("prompt.renameTag"), tag.name);
       if (name === null) return;
 
       const trimmed = name.trim();
       if (!trimmed) {
-        showToast("Назва тегу не може бути порожньою.");
+        showToast(t("toast.tagNameEmpty"));
         return;
       }
 
       const duplicate = state.tags.find((item) => item.id !== tagId && normalize(item.name) === normalize(trimmed));
       if (duplicate) {
-        const confirmed = confirm("Такий тег уже існує. Обʼєднати ці теги?");
+        const confirmed = confirm(t("confirm.mergeTags"));
         if (!confirmed) return;
 
         for (const card of state.cards) {
@@ -1122,14 +1470,14 @@ function renderStudy() {
       sortTags();
       saveState();
       renderAll();
-      showToast("Тег оновлено на всіх картках.");
+      showToast(t("toast.tagUpdated"));
     }
 
     function deleteTag(tagId) {
       const tag = state.tags.find((item) => item.id === tagId);
       if (!tag) return;
 
-      const confirmed = confirm(`Видалити тег “${tag.name}”? Картки залишаться, але без цього тегу.`);
+      const confirmed = confirm(t("confirm.deleteTag", { name: tag.name }));
       if (!confirmed) return;
 
       state.tags = state.tags.filter((item) => item.id !== tagId);
@@ -1139,19 +1487,19 @@ function renderStudy() {
 
       saveState();
       renderAll();
-      showToast("Тег видалено з усіх карток.");
+      showToast(t("toast.tagDeleted"));
     }
 
     function addQuickTag() {
       const name = els.quickTagName.value.trim();
       if (!name) {
-        showToast("Введіть назву тегу.");
+        showToast(t("toast.enterTagName"));
         return;
       }
 
       const existing = state.tags.find((tag) => normalize(tag.name) === normalize(name));
       if (existing) {
-        showToast("Такий тег уже існує.");
+        showToast(t("toast.tagExists"));
         return;
       }
 
@@ -1160,7 +1508,7 @@ function renderStudy() {
       els.quickTagName.value = "";
       saveState();
       renderAll();
-      showToast("Тег створено.");
+      showToast(t("toast.tagCreated"));
     }
 
     function csvEscape(value) {
@@ -1195,7 +1543,7 @@ function renderStudy() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      showToast(state.cards.length ? "CSV експортовано." : "Експортовано порожній CSV-шаблон.");
+      showToast(state.cards.length ? t("toast.csvExported") : t("toast.csvEmptyTemplate"));
     }
 
     function parseCsv(text) {
@@ -1427,7 +1775,7 @@ function renderStudy() {
     function importCardsFromCsvText(text, sourceEncoding = "") {
       const rows = parseCsv(text);
       if (!rows.length) {
-        showToast("CSV-файл порожній.");
+        showToast(t("toast.csvEmpty"));
         return;
       }
 
@@ -1481,7 +1829,7 @@ function renderStudy() {
       }
 
       if (!imported && !updatedDuplicates && !unchangedDuplicates) {
-        showToast("Не імпортовано жодної картки. Перевірте, чи заповнені перші дві колонки.");
+        showToast(t("toast.noCsvCardsImported"));
         return;
       }
 
@@ -1491,13 +1839,13 @@ function renderStudy() {
         renderAll();
       }
 
-      let message = imported ? `Імпортовано нових карток: ${imported}.` : "Нових карток не імпортовано.";
-      if (updatedDuplicates) message += ` Оновлено дублікатів: ${updatedDuplicates}.`;
-      if (unchangedDuplicates) message += ` Дублікатів без змін: ${unchangedDuplicates}.`;
-      if (sourceEncoding) message += ` Кодування: ${sourceEncoding}.`;
-      if (skipped) message += ` Пропущено рядків: ${skipped}.`;
+      let message = imported ? t("toast.csvImported", { count: imported }) : t("toast.csvNoNew");
+      if (updatedDuplicates) message += ` ${t("toast.csvUpdatedDuplicates", { count: updatedDuplicates })}`;
+      if (unchangedDuplicates) message += ` ${t("toast.csvUnchangedDuplicates", { count: unchangedDuplicates })}`;
+      if (sourceEncoding) message += ` ${t("toast.csvEncoding", { encoding: sourceEncoding })}`;
+      if (skipped) message += ` ${t("toast.csvSkipped", { count: skipped })}`;
       if (limitedModeFallbacks) {
-        message += ` ${limitedModeFallbacks} карт. розміщено в нижчий доступний режим через ліміт.`;
+        message += ` ${t("toast.csvLimitedMode", { count: limitedModeFallbacks })}`;
       }
       showToast(message);
     }
@@ -1511,10 +1859,10 @@ function renderStudy() {
           const decoded = decodeCsvArrayBuffer(reader.result);
           importCardsFromCsvText(decoded.text, decoded.encoding);
         } catch (error) {
-          showToast("Не вдалося розпізнати кодування CSV-файлу. Спробуйте зберегти файл як CSV UTF-8.");
+          showToast(t("toast.csvEncodingFailed"));
         }
       };
-      reader.onerror = () => showToast("Не вдалося прочитати CSV-файл.");
+      reader.onerror = () => showToast(t("toast.csvReadFailed"));
       reader.readAsArrayBuffer(file);
     }
 
@@ -1530,7 +1878,8 @@ function renderStudy() {
         resetStudyDeck();
         saveState();
         renderAll();
-        showToast(`У режимі “${sessionLabel}” більше немає карток.`);
+        publishStudyState();
+        showToast(t("toast.studyModeEmpty", { mode: sessionLabel }));
         return;
       }
 
@@ -1563,6 +1912,42 @@ function renderStudy() {
       setStudyCard(card, { ...options, sessionMode });
     }
 
+function getExtensionUrl(path) {
+  if (typeof chrome !== "undefined" && chrome.runtime?.getURL) {
+    return chrome.runtime.getURL(path);
+  }
+
+  return path;
+}
+
+function openStudyMiniWindow() {
+  const sessionMode = study?.sessionMode || getSelectedStudySessionMode();
+  const sideMode = els.studySideMode?.value || "random";
+  const params = new URLSearchParams({
+    session: sessionMode,
+    side: sideMode
+  });
+
+  if (study?.cardId) {
+    params.set("card", study.cardId);
+  }
+
+  const url = `${getExtensionUrl("study-mini.html")}?${params.toString()}`;
+
+  if (typeof chrome !== "undefined" && chrome.windows?.create) {
+    chrome.windows.create({
+      url,
+      type: "popup",
+      width: 480,
+      height: 720,
+      focused: true
+    });
+    return;
+  }
+
+  window.open(url, "aprendoStudyMini", "width=480,height=720");
+}
+
     function handleStudyAction(action) {
   if (!study) return;
 
@@ -1578,6 +1963,13 @@ function renderStudy() {
   if (action === "flip") {
     study.flipped = !study.flipped;
     renderStudy();
+    publishStudyState();
+    return;
+  }
+
+  if (action === "mini-window") {
+    publishStudyState();
+    openStudyMiniWindow();
     return;
   }
 
@@ -1597,7 +1989,7 @@ function renderStudy() {
       }
     }
 
-    showToast("Попередньої картки немає.");
+    showToast(t("toast.noPreviousCard"));
     return;
   }
 
@@ -1614,7 +2006,7 @@ function renderStudy() {
 
     pickStudyCard(card.id, { rememberCurrent: false, sessionMode });
 
-    showToast(`Картку переміщено в “${MODE_LABELS[action]}”.`);
+    showToast(t("toast.cardMoved", { mode: getModeLabel(action) }));
     return;
   }
 
@@ -1632,10 +2024,46 @@ function renderStudy() {
       input.value = `${input.value.slice(0, start)}${char}${input.value.slice(end)}`;
       input.focus();
       input.setSelectionRange(start + char.length, start + char.length);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
     function bindEvents() {
       els.createCardForm.addEventListener("submit", createCard);
+      els.createCardForm.addEventListener("reset", () => {
+        window.setTimeout(() => {
+          tagSelections.create.clear();
+          if (els.createTagSearch) els.createTagSearch.value = "";
+          renderTagCombobox("create");
+          renderCreateSideSuggestions();
+        }, 0);
+      });
+
+      [els.cardFront, els.cardBack].forEach((input) => {
+        input.addEventListener("input", renderCreateSideSuggestions);
+        input.addEventListener("change", renderCreateSideSuggestions);
+      });
+
+      const bindTagComboboxEvents = (type) => {
+        const ui = getTagCombobox(type);
+        if (!ui.search) return;
+
+        ui.search.addEventListener("input", () => renderTagCombobox(type));
+        ui.search.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            closeTagDropdown(type);
+            ui.button.focus();
+          }
+
+          if (event.key === "Enter" && !ui.createButton.hidden) {
+            event.preventDefault();
+            createTagFromCombobox(type);
+          }
+        });
+      };
+
+      bindTagComboboxEvents("create");
+      bindTagComboboxEvents("edit");
 
       els.quickAddTag.addEventListener("click", addQuickTag);
       els.quickTagName.addEventListener("keydown", (event) => {
@@ -1677,28 +2105,35 @@ function renderStudy() {
       }
 
       els.studySideMode.addEventListener("change", () => {
+        syncCustomSelect("studySideMode");
         saveStoredValue(STUDY_SIDE_MODE_KEY, els.studySideMode.value);
+        publishStudyState();
       });
 
       els.studySessionMode.addEventListener("change", () => {
+        syncCustomSelect("studySessionMode");
         study = null;
         studyHistory = [];
         resetStudyDeck();
         renderAll();
+        publishStudyState();
       });
 
       els.studyBtn.addEventListener("click", () => {
+        if (study) {
+          study = null;
+          studyHistory = [];
+          resetStudyDeck();
+          renderAll();
+          publishStudyState();
+          return;
+        }
+
         const sessionMode = getSelectedStudySessionMode();
 
         studyHistory = [];
         resetStudyDeck(sessionMode);
         pickStudyCard(null, { rememberCurrent: false, sessionMode });
-      });
-      els.closeStudyBtn.addEventListener("click", () => {
-        study = null;
-        studyHistory = [];
-        resetStudyDeck();
-        renderAll();
       });
 
       els.exportCsvBtn.addEventListener("click", exportCardsToCsv);
@@ -1711,7 +2146,7 @@ function renderStudy() {
       function applyBulkModeFromToolbar() {
         const mode = els.bulkModeSelect.value;
         if (!mode) {
-          showToast("Оберіть режим для групової дії.");
+          showToast(t("toast.chooseModeForBulk"));
           return;
         }
 
@@ -1723,14 +2158,10 @@ function renderStudy() {
       }
       
       els.clearSelectionBtn.addEventListener("click", clearAllSelections);
-      els.bulkApplyMode.addEventListener("click", applyBulkModeFromToolbar);
       els.bulkModeSelect.addEventListener("change", () => {
         if (els.bulkModeSelect.value) applyBulkModeFromToolbar();
       });
 
-      els.bulkAddTags.addEventListener("click", () => applyTagChange(getSelectedCardIds(), "add"));
-      els.bulkReplaceTags.addEventListener("click", () => applyTagChange(getSelectedCardIds(), "replace"));
-      els.bulkRemoveTags.addEventListener("click", () => applyTagChange(getSelectedCardIds(), "remove"));
       els.bulkDelete.addEventListener("click", () => deleteCards(getSelectedCardIds()));
 
       els.closeCardModal.addEventListener("click", closeCardModal);
@@ -1751,9 +2182,66 @@ function renderStudy() {
       });
 
       document.addEventListener("click", (event) => {
+        if (!event.target.closest(".tag-combobox")) {
+          closeAllTagDropdowns();
+        }
+
+        if (!event.target.closest("[data-custom-select]")) {
+          closeCustomSelects();
+        }
+
+        const customTrigger = event.target.closest(".custom-select-trigger");
+        if (customTrigger) {
+          const shell = customTrigger.closest("[data-custom-select]");
+          const menu = shell?.querySelector(".custom-select-menu");
+          if (menu) {
+            const willOpen = menu.hidden;
+            closeCustomSelects();
+            menu.hidden = !willOpen;
+            customTrigger.setAttribute("aria-expanded", String(willOpen));
+          }
+          return;
+        }
+
+        const customOption = event.target.closest("[data-custom-option]");
+        if (customOption) {
+          const select = document.getElementById(customOption.dataset.customOption);
+          if (select) {
+            select.value = customOption.dataset.value;
+            syncCustomSelect(select.id);
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+          closeCustomSelects();
+          return;
+        }
+
         const accentButton = event.target.closest("[data-char][data-target]");
         if (accentButton) {
           insertAtCursor(accentButton.dataset.target, accentButton.dataset.char);
+          return;
+        }
+
+        const tagComboboxTrigger = event.target.closest("[data-tag-combobox-trigger]");
+        if (tagComboboxTrigger) {
+          toggleTagDropdown(tagComboboxTrigger.dataset.tagComboboxTrigger);
+          return;
+        }
+
+        const tagOption = event.target.closest("[data-tag-option]");
+        if (tagOption) {
+          toggleTagSelection(tagOption.dataset.tagOption, tagOption.dataset.tagId);
+          return;
+        }
+
+        const tagCreateButton = event.target.closest("[data-tag-create]");
+        if (tagCreateButton) {
+          createTagFromCombobox(tagCreateButton.dataset.tagCreate);
+          return;
+        }
+
+        const tagRemoveButton = event.target.closest("[data-tag-remove]");
+        if (tagRemoveButton) {
+          removeTagSelection(tagRemoveButton.dataset.tagRemove, tagRemoveButton.dataset.tagId);
           return;
         }
 
@@ -1823,21 +2311,29 @@ function renderStudy() {
       els.studyPanel.addEventListener("input", (event) => {
         if (event.target.id === "studyAnswer" && study) {
           study.answer = event.target.value;
+          publishStudyState();
         }
       });
+
+      window.requestAnimationFrame(renderCreateSideSuggestions);
+      window.setTimeout(renderCreateSideSuggestions, 250);
     }
 
     async function initApp() {
+      if (window.AprendoI18n) {
+        await window.AprendoI18n.init({ onChange: renderAll });
+      }
       await loadStoredData();
       bindEvents();
       sortTags();
       await saveState();
-      renderAll();
+      const appliedSharedStudy = applySharedStudyState(storedStudySnapshot, { force: true });
+      if (!appliedSharedStudy) renderAll();
       bindExternalStorageSync();
     }
 
     initApp().catch((error) => {
       console.warn("Could not initialize app", error);
       renderAll();
-      showToast("Не вдалося завантажити дані. Спробуйте перезавантажити сторінку.");
+      showToast(t("toast.appLoadFailed"));
     });

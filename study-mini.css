@@ -1,0 +1,366 @@
+@font-face {
+  font-family: "Roboto Condensed";
+  src: url("fonts/roboto-condensed-v31-cyrillic_latin_latin-ext-200.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Roboto Condensed";
+  src: url("fonts/roboto-condensed-v31-cyrillic_latin_latin-ext-300.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Roboto Condensed";
+  src: url("fonts/roboto-condensed-v31-cyrillic_latin_latin-ext-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Roboto Condensed";
+  src: url("fonts/roboto-condensed-v31-cyrillic_latin_latin-ext-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Roboto Condensed";
+  src: url("fonts/roboto-condensed-v31-cyrillic_latin_latin-ext-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Roboto Condensed";
+  src: url("fonts/roboto-condensed-v31-cyrillic_latin_latin-ext-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Roboto Condensed";
+  src: url("fonts/roboto-condensed-v31-cyrillic_latin_latin-ext-800.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --bg: #fff3ec;
+  --panel: #ffffff;
+  --ink: #202020;
+  --muted: #817a77;
+  --line: #ffcfbf;
+  --accent: #ed3c11;
+  --accent-dark: #d72800;
+  --accent-soft: #fff0ea;
+  --green: #18b863;
+  --green-soft: #edfff3;
+  --blue: #1d7cff;
+  --blue-soft: #eef7ff;
+  --shadow: 0 12px 28px rgba(237, 60, 17, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 360px;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Roboto Condensed", "Arial Narrow", Arial, sans-serif;
+}
+
+button,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.study-mini {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(240px, 1fr) auto;
+  gap: 14px;
+  padding: 16px;
+}
+
+.mini-card,
+.mini-controls {
+  border-radius: 22px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.mini-titlebar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.mini-titlebar strong {
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 850;
+}
+
+.mini-window-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.65rem;
+  line-height: 1.05;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.mini-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 300px;
+  padding: 26px 20px;
+  text-align: center;
+}
+
+.side-label {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.card-word {
+  margin: 0;
+  font-size: clamp(2.3rem, 12vw, 4.6rem);
+  line-height: 1.04;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.study-notes {
+  margin: 20px auto 0;
+  max-width: 92%;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.42;
+  white-space: pre-wrap;
+}
+
+.empty-title {
+  margin: 0 0 8px;
+  font-size: 2rem;
+}
+
+.empty-text {
+  margin: 0;
+  color: var(--muted);
+}
+
+.mini-controls {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: linear-gradient(180deg, #ffefe7, #fff7f2);
+}
+
+.answer-label {
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.answer-box {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border: 1px solid #ff7b5a;
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: #fff;
+  outline: none;
+}
+
+.icon-row,
+.mode-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.primary,
+.ghost,
+.mini {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 8px;
+  border: 1px solid #ffc8b7;
+  min-height: 38px;
+  padding: 0 14px;
+  font-weight: 800;
+}
+
+.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.ghost,
+.mini {
+  background: #fff8f5;
+  color: var(--accent);
+}
+
+.mini.good {
+  border-color: #c9f1d8;
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.mini.blue {
+  border-color: #d3e7ff;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.icon-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.close-button {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.ui-icon {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  flex: 0 0 auto;
+  background: currentColor;
+  -webkit-mask: var(--icon-url) center / contain no-repeat;
+  mask: var(--icon-url) center / contain no-repeat;
+}
+
+.ui-icon-arrow-left { --icon-url: url("icons/ui/arrow-left.svg"); }
+.ui-icon-arrow-right { --icon-url: url("icons/ui/arrow-right.svg"); }
+.ui-icon-flip { --icon-url: url("icons/ui/flip.svg"); }
+.ui-icon-repeat { --icon-url: url("icons/ui/repeat.svg"); }
+
+/* Final mini-window corrections */
+:root {
+  --accent: #ed3c11;
+}
+
+.close-button,
+.mode-row .mini {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.answer-label {
+  font-weight: 600;
+}
+
+.card-word,
+.side-label {
+  font-weight: 400;
+}
+
+.study-flip-icon {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.study-flip-icon .ui-icon {
+  color: #fff;
+}
+
+.icon-row .ghost .ui-icon-arrow-left,
+.icon-row .ghost .ui-icon-arrow-right {
+  color: #111;
+}
+
+/* Match the main study controls exactly */
+.icon-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid #ffc8b7;
+  background: #fff8f5;
+  color: #111;
+}
+
+.icon-button.study-flip-icon {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.icon-button.study-flip-icon .ui-icon {
+  color: #fff;
+}
+
+/* Keep mini navigation buttons identical to the main study card */
+.icon-button {
+  box-sizing: border-box;
+  flex: 0 0 44px;
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid #ffc8b7;
+  background: #fff8f5;
+  color: #111;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.icon-button .ui-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-button.study-flip-icon {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.icon-button.study-flip-icon .ui-icon {
+  color: #fff;
+}
