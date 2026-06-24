@@ -3,7 +3,7 @@
   "default_locale": "uk",
   "name": "Aprendo Palabras",
   "short_name": "Aprendo Palabras",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "__MSG_extensionDescription__",
   "permissions": [
     "storage",
